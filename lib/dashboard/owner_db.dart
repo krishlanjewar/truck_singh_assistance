@@ -5,9 +5,11 @@ import '../config/theme.dart';
 import '../dashboard/widgets/feature_card.dart';
 import '../features/chat/agent_chat_list_page.dart';
 import '../features/driver_documents/driver_documents_page.dart';
+import '../features/trips/myTrips_history.dart';
 import '../features/truck_documents/truck_documents_page.dart';
 import '../widgets/common/app_bar.dart';
 import '../features/auth/services/supabase_service.dart';
+import 'package:logistics_toolkit/features/bilty/shipment_selection_page.dart';
 import '../services/onesignal_notification_service.dart';
 import '../services/chat_service.dart';
 import '../features/settings/presentation/screen/settings_page.dart';
@@ -27,6 +29,9 @@ import 'package:logistics_toolkit/features/tracking/shared_shipments_page.dart';
 import '../features/ratings/presentation/screen/trip_ratings.dart';
 import 'package:logistics_toolkit/features/Report%20Analysis/report_chart.dart';
 
+
+
+// A simple model to hold the dashboard's state
 class DashboardState {
   final bool isLoading;
   final String? error;
@@ -73,6 +78,7 @@ class TruckOwnerService {
         .single();
   }
 
+  // Uses an RPC for efficient calculation of stats on the database
   Future<Map<String, int>> getDashboardStats(String ownerId) async {
     final stats = await _supabase.rpc(
       'get_owner_dashboard_stats'.tr(),
@@ -377,7 +383,7 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
               color: Colors.green,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const BlankPage()),
+                MaterialPageRoute(builder: (context) => const ShipmentSelectionPage(),),
               ),
             ),
             FeatureCard(
@@ -387,7 +393,7 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
               color: Colors.blueGrey,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const BlankPage()),
+                MaterialPageRoute(builder: (context) => const MyTripsHistory()),
               ),
             ),
             FeatureCard(
