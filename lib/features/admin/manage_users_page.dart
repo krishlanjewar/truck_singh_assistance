@@ -22,10 +22,8 @@ class _ManageUsersPageState extends State<ManageUsersPage>
     'All',
     'shipper',
     'truckowner',
-    'driver_individual',
-    'driver_company',
-    'agent',
-    'admin',
+    'driver',        //remove driver_individual and driver_company
+    'agent',         //remove admin
   ];
 
   @override
@@ -34,13 +32,32 @@ class _ManageUsersPageState extends State<ManageUsersPage>
     _usersFuture = _fetchUsers();
     _tabController = TabController(length: 1, vsync: this);
   }
-
   Future<List<Map<String, dynamic>>> _fetchUsers() async {
+    // If the selected role is "driver", fetch all users so we can filter locally
+    final roleForQuery = _roleFilter == 'driver' ? 'All' : _roleFilter;
+
     final response = await Supabase.instance.client.rpc(
       'get_all_users_for_admin',
-      params: {'search_query': _searchQuery, 'role_filter': _roleFilter},
+      params: {'search_query': _searchQuery, 'role_filter': roleForQuery},
     );
-    return response == null ? [] : List<Map<String, dynamic>>.from(response);
+
+    final List<Map<String, dynamic>> allUsers =
+    response == null ? [] : List<Map<String, dynamic>>.from(response);
+
+    // Local filter: remove admin + combine both driver roles
+    final filteredUsers = allUsers.where((user) {
+      final role = (user['role'] ?? '').toLowerCase();
+      if (role == 'admin') return false; // hide admin always
+      if (_roleFilter == 'All') return true;
+      if (_roleFilter == 'driver') {
+        // combine both driver roles
+        return role == 'driver_individual' || role == 'driver_company';
+      }
+
+      return role == _roleFilter.toLowerCase();
+    }).toList();
+
+    return filteredUsers;
   }
 
   Future<void> _refresh() async {
@@ -80,39 +97,18 @@ class _ManageUsersPageState extends State<ManageUsersPage>
                     onPressed: () async {
                       setState(() => isProcessing = true);
                       try {
-                        final currentUser =
+                        final currentAdmin =
                             Supabase.instance.client.auth.currentUser;
-                        final userEmail = currentUser?.email ?? 'unknown_user';
-
-                        // Get the current user's role from their profile
-                        String currentUserRole = 'admin'; // Default fallback
-                        if (currentUser != null) {
-                          try {
-                            final profileResponse = await Supabase
-                                .instance
-                                .client
-                                .from('user_profiles')
-                                .select('role')
-                                .eq('user_id', currentUser.id)
-                                .maybeSingle();
-
-                            if (profileResponse != null &&
-                                profileResponse['role'] != null) {
-                              currentUserRole = profileResponse['role'];
-                              print('🔍 Current user role: $currentUserRole');
-                            }
-                          } catch (e) {
-                            print('Warning: Could not fetch user role: $e');
-                          }
-                        }
+                        final adminEmail =
+                            currentAdmin?.email ?? 'unknown_admin';
 
                         await toggleAccountStatusRpc(
                           customUserId:
                           user['custom_user_id'], // the user being toggled
                           disabled:
                           !isCurrentlyDisabled, // true = disable, false = enable
-                          changedBy: userEmail, // who did it
-                          changedByRole: currentUserRole, // actual role
+                          changedBy: adminEmail, // who did it
+                          changedByRole: 'admin', // role
                         );
 
                         Navigator.pop(ctx, true);
@@ -292,7 +288,12 @@ class _ManageUsersPageState extends State<ManageUsersPage>
               if (snapshot.hasError) {
                 return Center(child: Text("Error: ${snapshot.error}"));
               }
-              final users = snapshot.data ?? [];
+              final allUsers = snapshot.data ?? [];
+              // Filter out admin users completely
+              final users = allUsers
+                  .where((u) => (u['role'] ?? '').toLowerCase() != 'admin')
+                  .toList();
+
               if (users.isEmpty) {
                 return Center(child: Text("no_users_found".tr()));
               }
@@ -433,20 +434,54 @@ class _ManageUsersPageState extends State<ManageUsersPage>
   }
 
   Color _getRoleColor(String? role) {
-    switch (role?.toLowerCase()) {
-      case 'admin':
-        return Colors.red;
+    switch (role?.toLowerCase()) {  //remove the admin color
       case 'agent':
         return Colors.blue;
       case 'truckowner':
         return Colors.green;
       case 'driver_individual':
       case 'driver_company':
+      case 'driver':
         return Colors.orange;
       case 'shipper':
         return Colors.purple;
       default:
         return Colors.grey;
     }
+  }
+}
+final _supabase = Supabase.instance.client;
+Future<void> toggleAccountStatusRpc({
+  required String customUserId,
+  required bool disabled,
+  required String changedBy,
+  required String changedByRole,
+}) async {
+  try {
+    // Instead of using RPC, directly update the user_profiles table
+    // This avoids the type mismatch issue in the database function
+    await _supabase
+        .from('user_profiles')
+        .update({
+      'account_disable': disabled,
+      'updated_at': DateTime.now().toIso8601String(),
+    })
+        .eq('custom_user_id', customUserId);
+
+    // Log the status change in account_status_log if the table exists
+    try {
+      await _supabase.from('account_status_log').insert({
+        'custom_user_id': customUserId,
+        'disabled': disabled,
+        'changed_by': changedBy,
+        'changed_by_role': changedByRole,
+        'changed_at': DateTime.now().toIso8601String(),
+      });
+    } catch (logError) {
+      // Ignore if log table doesn't exist
+      print('Note: Could not log status change: $logError');
+    }
+  } catch (e) {
+    rethrow;
   }
 }
