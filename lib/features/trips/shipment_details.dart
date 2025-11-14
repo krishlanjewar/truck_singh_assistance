@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:logistics_toolkit/features/auth/services/supabase_service.dart';
 import 'package:logistics_toolkit/features/complains/complain_screen.dart';
@@ -394,7 +393,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
     String shipmentID = widget.shipment['shipment_id'];
     final initialEditCount = widget.shipment['edit_count'] as int? ?? 0;
     final currentEditCount =
-        ratingEditCount[shipmentID] as int? ?? initialEditCount;
+        ratingEditCount[shipmentID] ?? initialEditCount;
     bool isCompleted =
         widget.shipment['booking_status'].toString().toLowerCase() ==
             'completed';
@@ -404,7 +403,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
     );
     final bool isRatingPeriodExpired =
         deliveryDate != null &&
-            DateTime.now().isAfter(deliveryDate.add(const Duration(days: 7)));
+            DateTime.now().isAfter(deliveryDate.add(const Duration(days: 107)));
     final bool canRate =
         isCompleted && !editLimitReached && !isRatingPeriodExpired;
     return Scaffold(
@@ -745,7 +744,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => Rating(
+                              builder: (context) => Rating(
                                 shipmentId:
                                 widget.shipment['shipment_id'],
                               ),
@@ -768,8 +767,6 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
                                 ),
                               );
                             }
-
-                            // Pop this page and return the updated edit count
                             Navigator.pop(context, result);
                           }
                         }

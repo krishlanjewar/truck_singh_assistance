@@ -299,10 +299,15 @@ class _TruckDocumentsPageState extends State<TruckDocumentsPage>
     } else {
       _filteredTrucks = _trucks.where((truck) {
         final docs = truck['documents'] as Map<String, Map<String, dynamic>>;
-        return docs.values.any((doc) => doc['status'] == _selectedStatusFilter);
+        return docs.values.any((doc) =>
+        doc['status']
+            .toString()
+            .toLowerCase() ==
+            _selectedStatusFilter.toLowerCase());
       }).toList();
     }
   }
+
 
   Future<void> _uploadDocument(String truckNumber, String docType) async {
     // Check permissions - only agents and truck owners can upload

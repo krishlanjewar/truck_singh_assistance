@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:logistics_toolkit/features/blank.dart';
+import 'package:logistics_toolkit/dashboard/widgets/feature_card.dart';
 import 'package:logistics_toolkit/features/settings/presentation/screen/settings_page.dart';
 import 'package:logistics_toolkit/widgets/common/app_bar.dart';
 import 'package:permission_handler/permission_handler.dart' as handler;
@@ -11,6 +11,7 @@ import '../features/chat/driver_chat_list_page.dart';
 import '../features/complains/mycomplain.dart';
 import '../features/driver_status/driver_status_changer.dart';
 import '../features/driver_documents/driver_documents_page.dart';
+import '../features/ratings/presentation/screen/trip_ratings.dart';
 import '../features/truck_documents/truck_documents_page.dart';
 import '../features/notifications/real_time_notification_service.dart';
 import '../features/sos/company_driver_sos.dart';
@@ -418,6 +419,16 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
                                 );
                               },
                             ),
+                            FeatureCard(
+                              title: 'ratings'.tr(),
+                              subtitle: 'viewRatings'.tr(),
+                              icon: Icons.star_outline,
+                              color: Colors.orange,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const TripRatingsPage()),
+                              ),
+                            ),
                             _buildFeatureCard(
                               title: 'sos_title'.tr(),
                               subtitle: 'sos_subtitle'.tr(),
@@ -460,18 +471,6 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
                                 MaterialPageRoute(
                                     builder: (context) =>
                                     const DriverChatListPage()),
-                              ),
-                            ),
-                            _buildFeatureCard(
-                              title: 'My Ratings',
-                              subtitle: 'View Ratings',
-                              icon: Icons.star_border_outlined,
-                              color: Colors.orange,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                    const BlankPage()),
                               ),
                             ),
                           ],

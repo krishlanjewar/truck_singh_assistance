@@ -136,13 +136,12 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
       })
           .eq('shipment_id', currentShipment!['shipment_id']);
 
-      // ✅ If the shipment was completed, clear it from view
       if (newStatus.toLowerCase() == 'completed') {
         currentShipment = null;
-        if (mounted) setState(() {}); // ✅ Force rebuild safely
+        if (mounted) setState(() {});
       } else {
         await fetchCurrentShipment();
-        if (mounted) setState(() {}); // ✅ Ensure rebuild after refresh
+        if (mounted) setState(() {});
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,9 +155,6 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
           ),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
         ),
       );
     } catch (e) {
@@ -263,11 +259,10 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
   }
 
   Widget _buildBottomAppBar() {
-    // Hide the TRACK button if shipment is completed or no shipment
     if (currentShipment == null ||
         currentShipment!['booking_status']?.toString().toLowerCase() ==
             'completed') {
-      return const SizedBox.shrink(); // No bottom bar
+      return const SizedBox.shrink();
     }
 
     return BottomAppBar(
@@ -299,22 +294,22 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
     );
   }
 
-  // 🌓 Updated for dark mode
   Widget buildShipmentDetails() {
     if (currentShipment == null) return const SizedBox.shrink();
 
-    final theme = Theme.of(context); // 🌓 Access theme
-    final isDark = theme.brightness == Brightness.dark; // 🌓 Check mode
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final deliveryDate = DateTime.parse(currentShipment!['delivery_date']);
     final isUrgent = deliveryDate.difference(DateTime.now()).inDays <= 1;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.zero,
+      height: 350, // 🔥 FIX: scrollable fixed height box
       decoration: BoxDecoration(
         color: isDark
-            ? theme.colorScheme.surfaceVariant.withOpacity(0.3) // 🌓 Dark bg
-            : Colors.white, // 🌓 Light bg
+            ? theme.colorScheme.surfaceVariant.withOpacity(0.3)
+            : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -327,78 +322,89 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'shipment_details'.tr(),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface, // 🌓 Text adaptive
+          // TITLE ROW (fixed)
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'shipment_details'.tr(),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              if (isUrgent)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    'urgent'.tr(),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                if (isUrgent)
+                  Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'urgent'.tr(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-          _buildDetailItem(
-            Icons.confirmation_number,
-            'shipment_id'.tr(),
-            currentShipment!['shipment_id']
-                .toString()
-                .substring(0, 12)
-                .toUpperCase(),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  _buildDetailItem(
+                    Icons.confirmation_number,
+                    'shipment_id'.tr(),
+                    currentShipment!['shipment_id']
+                        .toString()
+                        .substring(0, 12)
+                        .toUpperCase(),
+                  ),
+                  _buildDetailItem(Icons.upload, 'pickup_location'.tr(),
+                      currentShipment!['pickup']),
+                  _buildDetailItem(Icons.download, 'drop_location'.tr(),
+                      currentShipment!['drop']),
+                  _buildDetailItem(Icons.inventory_2, 'item'.tr(),
+                      currentShipment!['shipping_item']),
+                  _buildDetailItem(Icons.category, 'material'.tr(),
+                      currentShipment!['material_inside']),
+                  _buildDetailItem(Icons.monitor_weight, 'weight'.tr(),
+                      '${currentShipment!['weight']} kg'),
+                  _buildDetailItem(Icons.local_shipping, 'truck_type'.tr(),
+                      currentShipment!['truck_type']),
+                  _buildDetailItem(Icons.schedule, 'pickup_time'.tr(),
+                      currentShipment!['pickup_time']),
+                  _buildDetailItem(
+                    Icons.calendar_today,
+                    'delivery_date'.tr(),
+                    DateFormat('MMM dd, yyyy').format(deliveryDate),
+                    isUrgent: isUrgent,
+                  ),
+                  if (currentShipment!['notes'] != null &&
+                      currentShipment!['notes'].isNotEmpty)
+                    _buildDetailItem(Icons.note_alt, 'special_notes'.tr(),
+                        currentShipment!['notes']),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
           ),
-          _buildDetailItem(Icons.upload, 'pickup_location'.tr(),
-              currentShipment!['pickup']),
-          _buildDetailItem(
-              Icons.download, 'drop_location'.tr(), currentShipment!['drop']),
-          _buildDetailItem(
-              Icons.inventory_2, 'item'.tr(), currentShipment!['shipping_item']),
-          _buildDetailItem(Icons.category, 'material'.tr(),
-              currentShipment!['material_inside']),
-          _buildDetailItem(Icons.monitor_weight, 'weight'.tr(),
-              '${currentShipment!['weight']} kg'),
-          _buildDetailItem(Icons.local_shipping, 'truck_type'.tr(),
-              currentShipment!['truck_type']),
-          _buildDetailItem(Icons.schedule, 'pickup_time'.tr(),
-              currentShipment!['pickup_time']),
-          _buildDetailItem(
-            Icons.calendar_today,
-            'delivery_date'.tr(),
-            DateFormat('MMM dd, yyyy').format(deliveryDate),
-            isUrgent: isUrgent,
-          ),
-          if (currentShipment!['notes'] != null &&
-              currentShipment!['notes'].isNotEmpty)
-            _buildDetailItem(Icons.note_alt, 'special_notes'.tr(),
-                currentShipment!['notes']),
         ],
       ),
     );
   }
 
-  // 🌓 Updated for dark mode text
+
   Widget _buildDetailItem(IconData icon, String label, String value,
       {bool isUrgent = false}) {
     final theme = Theme.of(context);
@@ -424,7 +430,7 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
               size: 20,
               color: isUrgent
                   ? Colors.red
-                  : theme.colorScheme.onSurface.withOpacity(0.7), // 🌓
+                  : theme.colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
           const SizedBox(width: 12),
@@ -436,8 +442,7 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
                   label,
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
-                    color:
-                    theme.colorScheme.onSurface.withOpacity(0.7), // 🌓 Label
+                    color: theme.colorScheme.onSurface.withOpacity(0.7),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -445,8 +450,9 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
                   value,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color:
-                    isUrgent ? Colors.red : theme.colorScheme.onSurface, // 🌓
+                    color: isUrgent
+                        ? Colors.red
+                        : theme.colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -510,6 +516,7 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -518,56 +525,75 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
         foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         elevation: 0,
       ),
-      body: ptr.SmartRefresher(
-        controller: _refreshController,
-        onRefresh: fetchCurrentShipment,
-        enablePullDown: true,
-        enablePullUp: false,
-        header: const ptr.WaterDropHeader(), // Nice pull-down animation
-        child: isLoading && currentShipment == null
-            ? const Center(child: CircularProgressIndicator())
-            : currentShipment == null
-            ? ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            const SizedBox(height: 100),
-            Icon(Icons.assignment_turned_in, size: 80, color: Colors.grey),
-            const SizedBox(height: 24),
-            Center(
-              child: Text(
-                'no_active_shipment'.tr(),
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+
+          final bottomPadding =
+              kBottomNavigationBarHeight + MediaQuery.of(context).padding.bottom + 16;
+
+          return ptr.SmartRefresher(
+            controller: _refreshController,
+            onRefresh: fetchCurrentShipment,
+            enablePullDown: true,
+            enablePullUp: false,
+            header: const ptr.WaterDropHeader(),
+
+            child: SizedBox(
+              height: constraints.maxHeight,
+              child: _buildListForContent(bottomPadding),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                'no_shipments_assigned'.tr(),
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-              ),
-            ),
-          ],
-        )
-            : SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              buildProgressIndicator(),
-              buildCurrentStatusCard(),
-              const SizedBox(height: 20),
-              buildShipmentDetails(),
-              buildActionButton(),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
+          );
+        },
       ),
       bottomNavigationBar: _buildBottomAppBar(),
+    );
+  }
+
+
+  Widget _buildListForContent(double bottomPadding) {
+    if (isLoading && currentShipment == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (currentShipment == null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        children: [
+          const SizedBox(height: 100),
+          Icon(Icons.assignment_turned_in, size: 80, color: Colors.grey),
+          const SizedBox(height: 24),
+          Center(
+            child: Text(
+              'no_active_shipment'.tr(),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'no_shipments_assigned'.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView(
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      children: [
+        buildProgressIndicator(),
+        buildCurrentStatusCard(),
+        const SizedBox(height: 20),
+        buildShipmentDetails(),
+        buildActionButton(),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
