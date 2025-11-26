@@ -113,6 +113,25 @@ class ShipmentService {
       rethrow;
     }
   }
+
+  static Future<String?> getStatusByShipmentId({required String shipmentId}) async {
+    try {
+      if (shipmentId.isEmpty) {
+        throw Exception("Invalid ShipmentId");
+      }
+      final response = await Supabase.instance.client
+          .from('shipment')
+          .select('booking_status')
+          .eq('shipment_id', shipmentId)
+          .single();
+
+      return response['booking_status'] as String?;
+    } catch (e) {
+      print('Error in getShipmentsByStatus: $e');
+      throw Exception('Failed to fetch shipments by status.');
+    }
+  }
+
   static Future<void> assignDriver({
     required String shipmentId,
     required String driverUserId,

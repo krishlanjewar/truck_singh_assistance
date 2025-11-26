@@ -49,6 +49,9 @@ dependencies:
   easy_localization: ^3.0.5
   pdfx: ^2.9.2
   fl_chart: ^0.71.0
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.0.0
+  animations: ^2.0.8
   
 
 
@@ -78,3 +81,4 @@ flutter:
     - assets/TruckSinghbgr.png
     - assets/TruckSingh.jpeg
     - assets/appstore.png
+    - assets/chatbot.png
