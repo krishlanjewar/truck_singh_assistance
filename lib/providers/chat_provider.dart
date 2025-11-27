@@ -27,10 +27,13 @@ class ChatMessage {
     return {
       "text": text,
       "isUser": isUser,
-      "action": actionParameters?["action"],
-      "language": actionParameters?["language"],
+      if (actionParameters?["action"] != null)
+        "action": actionParameters!["action"],
+      if (actionParameters?["language"] != null)
+        "language": actionParameters!["language"],
     };
   }
+
 }
 
 class ChatProvider extends ChangeNotifier {
@@ -117,29 +120,47 @@ class ChatProvider extends ChangeNotifier {
 
       //if the action requires a DB query, do it here
       switch (parsed.action) {
-        //GET MARKETPLACE SHIPMENTS
-        case 'get_marketplace_shipments':
-          final list = await ShipmentService.getAvailableMarketplaceShipments();
-          final market_place_shipments_ids = filterIdsByMap(list, "shipment_id");
-          replyText = "${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${market_place_shipments_ids.join(",")}";
-          break;
 
-        // agr fail ho gaya to kaise krenge handle abhi isliye stop
-        // //ACCEPT MARKETPLACE SHIPMENTS
-        //   case 'accept_marketplace_shipments':
-        //     var  shipmentId = params["shipment_id"];
-        //     await ShipmentService.acceptMarketplaceShipment(shipmentId: shipmentId) ;
-        //     replyText = "marketplace shipments are accepted for shipment Id: $shipmentId }";
-        //     break;
-        //
-
-        //GET ACTIVE SHIPMENTS
+      //GET ACTIVE SHIPMENTS
         case 'get_active_shipments':
           final response = await ShipmentService.getAllMyShipments();
           final count = (response as List).length;
           final active_shipment_ids = filterIdsByMap(response, 'shipment_id');
           replyText = 'Aapki $count shipments abhi active hain.\nActive Shipments IDs: ${active_shipment_ids.join(",")}';
           break;
+
+      //GET COMPLETED SHIPMENTS
+        case 'get_completed_shipments':
+          final response = await ShipmentService.getAllMyCompletedShipments();
+          final completed = (response as List).length;
+          replyText = 'Aapke $completed shipments complete ho chuke hain.';
+          break;
+
+      //GET SHARED SHIPMENTS
+        case 'get_shared_shipments':
+          final response = await ShipmentService.getSharedShipments();
+          final shipment_ids = response.map((singleShipment) => singleShipment['shipment_id']).toList();
+          if(shipment_ids.length == 0){
+            replyText = 'koi bhi shipment shared nahi hai';
+          }
+          else {
+            replyText = 'Apke paas ${shipment_ids
+                .length} shipments abhi shared hain.\nShipments Id:${shipment_ids
+                .join(",")}';
+          }
+          break;
+
+
+
+
+      //GET MARKETPLACE SHIPMENTS
+        case 'get_marketplace_shipments':
+          final list = await ShipmentService.getAvailableMarketplaceShipments();
+          final market_place_shipments_ids = filterIdsByMap(list, "shipment_id");
+          replyText = "${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${market_place_shipments_ids.join(",")}";
+          break;
+
+
 
         //GET SHIPMENTS BY STATUS
         case 'get_shipments_by_status':
@@ -154,13 +175,30 @@ class ChatProvider extends ChangeNotifier {
 
         //GET AVAILABLE TRUCKS
         case 'get_available_trucks':
-          final res = await supabase
-              .from('trucks')
-              .select()
-              .eq('status', 'available');
-          final count = (res as List).length;
-          final truck_numbers = filterIdsByMap(res, "truck_number");
-          replyText = '$count trucks abhi khali hain.\nTrucks Number:${truck_numbers.join(",")}';
+          final response = await ShipmentService.getAvailableTrucks();
+          final truck_numbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
+          if(truck_numbers.length == 0){
+            replyText = '${response.length} trucks abhi khali hain';
+          }
+          else {
+            replyText = '${response
+                .length} trucks abhi khali hain.\nTrucks Number:${truck_numbers
+                .join(",")}';
+          }
+          break;
+
+      //GET ALL TRUCKS
+        case 'get_my_trucks':
+          final response = await ShipmentService.getAllTrucks();
+          final truck_numbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
+          if(truck_numbers.length == 0){
+            replyText = '${response.length} trucks hain';
+          }
+          else {
+            replyText = '${response
+                .length} trucks  hain.\nTrucks Number:${truck_numbers
+                .join(",")}';
+          }
           break;
 
         //GET AVAILABLE TRUCKS
@@ -173,12 +211,7 @@ class ChatProvider extends ChangeNotifier {
           replyText = '$count trucks abhi trip pr hain.';
           break;
 
-        //GET COMPLETED SHIPMENTS
-        case 'get_completed_shipments':
-          final response = await ShipmentService.getAllMyCompletedShipments();
-          final completed = (response as List).length;
-          replyText = 'Aapke $completed shipments complete ho chuke hain.';
-          break;
+
 
         //GET DRIVER DETAILS BY DRIVER_ID
         case 'get_driver_details':

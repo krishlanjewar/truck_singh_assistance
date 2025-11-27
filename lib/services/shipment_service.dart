@@ -154,4 +154,76 @@ class ShipmentService {
       rethrow;
     }
   }
+
+  static Future<List<Map<String,dynamic>>> getAvailableTrucks() async {
+    try{
+      final customUserId = await UserDataService.getCustomUserId();
+      if (customUserId == null) {
+        throw Exception("User not logged in or has no custom ID");
+      }
+
+    final response =  await _supabase
+        .from('trucks')
+        .select()
+        .eq('status', 'available')
+      .eq('truck_admin',customUserId);
+
+      return List<Map<String, dynamic>>.from(response);
+    }
+    catch (e) {
+      print("Error getting all loads: $e");
+      rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllTrucks() async {
+    try {
+      final customUserId = await UserDataService.getCustomUserId();
+      if (customUserId == null) {
+        throw Exception("User not logged in or has no custom ID");
+      }
+
+      final response = await _supabase
+          .from('trucks')
+          .select()
+          .eq('truck_admin', customUserId); // All trucks of current user
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print("Error getting trucks: $e");
+      rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getSharedShipments() async {
+    try {
+      final response = await _supabase.rpc(
+        'get_shipments_shared_with_me',
+      );
+
+      if (response != null && response is List) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+
+      return [];
+    } catch (e) {
+      print("Error fetching shared shipments: $e");
+      rethrow;
+    }
+  }
+
+  static Future<void> getTrackTrucks() async {
+    try{
+
+    }
+    catch(e){
+      print("Error fetching shared shipments: $e");
+      rethrow;
+    }
+  }
+
+
+
+
+
 }

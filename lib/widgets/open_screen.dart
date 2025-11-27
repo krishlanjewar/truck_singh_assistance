@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:logistics_toolkit/features/auth/services/supabase_service.dart';
 import 'package:logistics_toolkit/features/driver_documents/driver_documents_page.dart';
 import 'package:logistics_toolkit/features/laod_assignment/presentation/screen/allLoads.dart';
 import 'package:logistics_toolkit/features/mytruck/mytrucks.dart';
@@ -15,7 +16,7 @@ import '../features/ratings/presentation/screen/trip_ratings.dart';
 import '../features/tracking/shared_shipments_page.dart';
 import '../features/truck_documents/truck_documents_page.dart';
 
-void openScreen(String? screen, context, Map params) {
+Future<void> openScreen(String? screen, context, Map params) async {
   switch (screen) {
     case "my_shipments":
       Navigator.push(context, MaterialPageRoute(builder: (_) => MyShipments()));
@@ -36,13 +37,22 @@ void openScreen(String? screen, context, Map params) {
       break;
 
     case "track_truck":
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              TrackTrucksPage(truckOwnerId: params["truck_owner_id"]),
-        ),
-      );
+     // final truckOwnerIdList = params["truck_owner_id"];
+     // final truckOwnerId = (truckOwnerIdList is List && truckOwnerIdList.isNotEmpty) ? truckOwnerIdList.first : null;
+     //
+     // if(truckOwnerId == null){
+     //   print("truckOwnerId: $truckOwnerId is null");
+     //   break;
+     // }
+
+       Navigator.push(
+         context,
+         MaterialPageRoute(
+           builder: (_) =>
+               TrackTrucksPage(truckOwnerId: params["truck_owner_id"]),
+         ),
+       );
+
       break;
 
     case "my_trucks":

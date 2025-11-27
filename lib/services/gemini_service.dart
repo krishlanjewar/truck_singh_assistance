@@ -21,8 +21,11 @@ class GeminiService {
     String userInput,
     List<ChatMessage> conversation,
   ) async {
-    final currentUser = SupabaseService.getCurrentUser();
+    final currentUser = await SupabaseService.getCurrentUser();
     final userId = currentUser?.id;
+    final customUserId = await SupabaseService.getCustomUserId(userId!);
+    print("$customUserId ye hai gemini service me");
+
     UserRole? role;
 
     if (userId != null) {
@@ -50,18 +53,17 @@ Always use the HISTORY to maintain context across multiple turns.
 --------------------------------------------------
 SUPPORTED ACTIONS
 --------------------------------------------------
-1. open_screen
-2. get_active_shipments
-3. get_completed_shipments
-4. get_all_loads   //
-5. get_shared_shipments  //
-6. get_my_trucks  //
-7. get_available_trucks  
-8. track_trucks  // error for pass null id
+1. open_screen                         ✅ 
+2. get_active_shipments                ✅  
+3. get_completed_shipments             ✅
+5. get_shared_shipments                ✅        abhi checking baki hai ok ui me only add krke check krna hai bas
+6. get_my_trucks                       ✅
+7. get_available_trucks                ✅
+8. track_trucks                        
 9. get_driver_list   //
 10. get_driver_details   //// id pass ni hui hai direct 
-11. get_shipments_by_status  // 
-12. get_status_by_shipment_id
+11. get_shipments_by_status  //            
+12. get_status_by_shipment_id              ✅
 12. unknown
 
 --------------------------------------------------
@@ -101,13 +103,16 @@ And parameters MUST BE:
 }
 
 VALID PARAMETERS FOR track_truck
-"action" : "track_truck"
-"push this id : $userId for pass in the parameter"
-
-parameter MUST BE:
+If user ask open  "track_trucks"  screen then PARAMETERS MUST include:
 {
-  "truck_owner_id": ["<$userId>"]
-} 
+  "truck_owner_id": [$customUserId]
+}
+
+Return this value ALWAYS, even if user does not mention it.
+Never return empty list.
+Never return null.
+Never return missing truck_owner_id.
+
 
 
 --------------------------------------------------
@@ -120,6 +125,7 @@ When the user asks:
 - accepted shipments count
 - delivered shipments kitni hain
 
+// bro ye jo hai na data get ke liye hai.
 Then action MUST BE:
 "action": "get_shipments_by_status"
 
@@ -211,54 +217,18 @@ Never explain your reasoning.
 
 ''';
 
-    //prompt variable this is store the train comment
-    // try {
-    // final systemPrompt =
-    //     '''
-    //   You are Truck Singh app assistant.
-    //   Current Dashboard: $role  // Owner / Driver / Vendor / Admin
-    //   Rules:
-    //   - Only answer queries allowed for this dashboard.
-    //   -Always use and remember full conversation context sent to you in 'History'.
-    //    Never forget previous replies unless user resets.
-    //
-    //   Always respond with a valid JSON only. Format:
-    //   {
-    //   "action": "<action_name>",                  // one of: get_active_shipments , get_completed_shipments, get_available_trucks, open_screen, get_driver_details, unknown
-    //   "parameters":{ /* action-specific */ },
-    //   "reply": "<human friendly reply string>",    // visible text to user
-    //   "language": "<ISO-639-1 language code>"      // e.g. "hi" , "en", "mr" . Match the user's language
-    //     }
-    //
-    //     Supported actions: get_active_shipments , get_completed_shipments, get_available_trucks, open_screen, get_driver_details.
-    //     Supported actions:
-    //     open_screen
-    //     get_active_shipments
-    //     get_completed_shipments
-    //     get_all_loads
-    //     get_shared_shipments
-    //     get_my_trucks
-    //     get_available_trucks
-    //     track_trucks
-    //     get_driver_list
-    //     get_driver_details
-    //     unknown.
-    //     If you cannot parse return {"action":"unknown","parameters":{},"reply":"I couldn't understand.","language":"en"}.
-    //     Respond ONLY JSON. No commentary
-    //    ''';
-
     final requestBody = {
       "contents": [
         {
-          "role": "user",
+          "role": "model",
           "parts": [
-            {"text": "SYSTEM_PROMPT: $systemPrompt"},
+            {"text": systemPrompt },
           ],
         },
         {
           "role": "user",
           "parts": [
-            {"text": "HISTORY: $history"},
+            {"text": "HISTORY: ${jsonEncode(history)}"},
           ],
         },
         {
