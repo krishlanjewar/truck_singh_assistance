@@ -10,6 +10,7 @@ import 'dashboard_router.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   final UserRole selectedRole;
+
   const ProfileSetupPage({super.key, required this.selectedRole});
 
   @override
@@ -18,24 +19,27 @@ class ProfileSetupPage extends StatefulWidget {
 
 class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
-  final _mobileCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  DateTime? _dob;
-  bool _loading = false;
+  final _nameController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _emailController = TextEditingController();
+  DateTime? _selectedDate;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    // Prefill email from Supabase auth
     final user = SupabaseService.getCurrentUser();
-    if (user?.email != null) _emailCtrl.text = user!.email!;
+    if (user?.email != null) {
+      _emailController.text = user!.email!;
+    }
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _mobileCtrl.dispose();
-    _emailCtrl.dispose();
+    _nameController.dispose();
+    _mobileController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -43,36 +47,40 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(
-          onPressed: () => Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (_) => RoleSelectionPage())),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => RoleSelectionPage()),
+            );
+          },
         ),
+        // --- END FIX ---
         title: Text('complete_your_profile'.tr()),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
-      body: _loading
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _roleInfo(),
+              _buildRoleInfo(),
               const SizedBox(height: 24),
-              _textField(_nameCtrl, 'full_name'.tr(), Icons.person,
-                  validator: (v) => v!.trim().isEmpty
-                      ? 'please_enter_full_name'.tr()
-                      : null),
+              _buildNameField(),
               const SizedBox(height: 16),
-              _dobPicker(),
+              _buildDateOfBirthField(),
               const SizedBox(height: 16),
-              _mobileField(),
+              _buildMobileField(),
               const SizedBox(height: 16),
-              _emailField(),
+              _buildEmailField(),
               const SizedBox(height: 32),
-              _submitBtn(),
+              _buildSubmitButton(),
             ],
           ),
         ),
@@ -80,183 +88,264 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     );
   }
 
-  Widget _roleInfo() => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.blue.withOpacity(.1),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Icon(widget.selectedRole.icon, color: Colors.blue),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
+  Widget _buildRoleInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withAlpha(26), // 10% opacity
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(widget.selectedRole.icon, color: Colors.blue, size: 24),
+          const SizedBox(width: 12),
+          Text(
             "selected_role".tr(
-                namedArgs: {"role": widget.selectedRole.displayName}),
+              namedArgs: {"role": widget.selectedRole.displayName},
+            ),
             style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.blue),
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.blue,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _textField(TextEditingController c, String label, IconData icon,
-      {String? Function(String?)? validator, bool enabled = true}) =>
-      TextFormField(
-        controller: c,
-        validator: validator,
-        enabled: enabled,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon),
-          border: OutlineInputBorder(),
-        ),
-      );
-
-  Widget _dobPicker() => InkWell(
-    onTap: _pickDate,
-    child: InputDecorator(
-      decoration: InputDecoration(
-        labelText: 'date_of_birth'.tr(),
-        border: OutlineInputBorder(),
-        prefixIcon: Icon(Icons.calendar_today),
-      ),
-      child: Text(
-        _dob == null
-            ? 'select_dob'.tr()
-            : "${_dob!.day}/${_dob!.month}/${_dob!.year}",
-      ),
-    ),
-  );
-
-  Widget _mobileField() => TextFormField(
-    controller: _mobileCtrl,
-    keyboardType: TextInputType.phone,
-    inputFormatters: [
-      FilteringTextInputFormatter.digitsOnly,
-      LengthLimitingTextInputFormatter(10)
-    ],
-    validator: (v) => v == null || v.isEmpty
-        ? 'please_enter_mobile'.tr()
-        : v.length != 10
-        ? 'please_enter_valid_mobile'.tr()
-        : null,
-    decoration: InputDecoration(
-      labelText: 'mobile_number'.tr(),
-      prefixText: '+91 ',
-      prefixIcon: Icon(Icons.phone),
-      border: OutlineInputBorder(),
-    ),
-  );
-
-  Widget _emailField() => _textField(
-    _emailCtrl,
-    'email'.tr(),
-    Icons.email,
-    validator: (value) {
-      if (value == null || value.isEmpty) return 'please_enter_email'.tr();
-      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-          .hasMatch(value.trim())) return 'please_enter_valid_email'.tr();
-      return null;
-    },
-  );
-
-  Widget _submitBtn() => SizedBox(
-    width: double.infinity,
-    height: 50,
-    child: ElevatedButton(
-      style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8))),
-      onPressed: _submit,
-      child: Text('complete_setup'.tr(),
-          style:
-          const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-    ),
-  );
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime(1950),
-      lastDate: DateTime.now(),
-      initialDate: DateTime.now().subtract(const Duration(days: 6570)),
-    );
-    if (picked != null) setState(() => _dob = picked);
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_dob == null) return _error('please_select_dob'.tr());
-
-    final user = SupabaseService.getCurrentUser();
-    if (user == null) return _error('please_sign_in_continue'.tr());
-
-    setState(() => _loading = true);
-
-    try {
-      final customId = await _generateId();
-      final ok = await SupabaseService.saveUserProfile(
-        userId: user.id,
-        customUserId: customId,
-        role: widget.selectedRole,
-        name: _nameCtrl.text.trim(),
-        dateOfBirth: _dob!.toIso8601String(),
-        mobileNumber: _mobileCtrl.text.trim(),
-        email: user.email,
-      );
-
-      if (!ok) return _error('failed_save_profile'.tr());
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profile setup completed!')));
-
-      await Future.delayed(const Duration(milliseconds: 600));
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-            builder: (_) => DashboardRouter(role: widget.selectedRole)),
-            (_) => false,
-      );
-    } catch (e) {
-      _error('error_occurred'.tr());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _error(String msg) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('error'.tr()),
-        content: Text(msg),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('ok'.tr()))
         ],
       ),
     );
   }
 
-  Future<String> _generateId() async {
-    final prefix = widget.selectedRole.prefix;
-    final rand = Random();
-    for (var i = 0; i < 10; i++) {
-      final id = "$prefix${rand.nextInt(10000).toString().padLeft(4, '0')}";
-      final exists = await SupabaseService.client
-          .from('user_profiles')
-          .select()
-          .eq('custom_user_id', id)
-          .maybeSingle();
-      if (exists == null) return id;
+  Widget _buildNameField() {
+    return TextFormField(
+      controller: _nameController,
+      decoration: InputDecoration(
+        labelText: 'full_name'.tr(),
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.person),
+      ),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'please_enter_full_name'.tr();
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildDateOfBirthField() {
+    return InkWell(
+      onTap: _selectDate,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'date_of_birth'.tr(),
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.calendar_today),
+        ),
+        child: Text(
+          _selectedDate != null
+              ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+              : 'select_dob'.tr(),
+          /*style: TextStyle(
+            //color: _selectedDate != null ? Colors.black : Colors.grey,
+          ),*/
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileField() {
+    return TextFormField(
+      controller: _mobileController,
+      decoration: InputDecoration(
+        labelText: 'mobile_number'.tr(),
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.phone),
+        prefixText: '+91 ',
+      ),
+      keyboardType: TextInputType.phone,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(10),
+      ],
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'please_enter_mobile'.tr();
+        }
+        if (value.length != 10) {
+          return 'please_enter_valid_mobile'.tr();
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildEmailField() {
+    return TextFormField(
+      controller: _emailController,
+      enabled: true,//changed from false to true
+      decoration: InputDecoration(
+        labelText: 'email'.tr(),
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.email),
+        filled: true,
+        //fillColor: Color(0xFFEEEEEE),
+      ),
+      keyboardType: TextInputType.emailAddress,
+      validator: (value) {
+        // 1. Checking if it's empty
+        if (value == null || value.trim().isEmpty) {
+          return 'please_enter_email'.tr();
+        }
+
+        // 2. Checking if it's a valid format
+        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+        if (!emailRegex.hasMatch(value)) {
+          return 'please_enter_valid_email'.tr();
+        }
+
+        // 3. If it's all good, return null (no error)
+        return null;
+      },
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: _submitProfile,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(
+          'complete_setup'.tr(),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(
+        const Duration(days: 6570),
+      ),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        _selectedDate = pickedDate;
+      });
     }
-    throw Exception('failed_generate_id');
+  }
+
+  Future<void> _submitProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_selectedDate == null) {
+      _showErrorDialog('please_select_dob'.tr());
+      return;
+    }
+
+    final user = SupabaseService.getCurrentUser();
+    if (user == null) {
+      _showErrorDialog('please_sign_in_continue'.tr());
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // ✅ Generate the custom role-based ID
+      final customUserId = await generateUniqueUserId();
+      final success = await SupabaseService.saveUserProfile(
+        userId: user.id,
+        customUserId: customUserId,
+        role: widget.selectedRole,
+        name: _nameController.text.trim(),
+        dateOfBirth: _selectedDate!.toIso8601String(),
+        mobileNumber: _mobileController.text.trim(),
+        email: user.email,
+      );
+
+      if (success) {
+        // Profile completed successfully!
+        print('✅ Profile setup completed successfully');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile setup completed!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          await Future.delayed(const Duration(seconds: 1));
+          if (mounted) {
+            print(
+              '🚀 Navigating to dashboard for role: ${widget.selectedRole}',
+            );
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) =>
+                    DashboardRouter(role: widget.selectedRole),
+              ),
+                  (route) => false,
+            );
+          }
+        }
+      } else {
+        _showErrorDialog('failed_save_profile'.tr());
+      }
+    } catch (e) {
+      _showErrorDialog('error_occurred'.tr());
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('error'.tr()),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('ok'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String> generateUniqueUserId() async {
+    final prefix = widget.selectedRole.prefix;
+    final random = Random();
+
+    for (int i = 0; i < 10; i++) {
+      final number = random.nextInt(10000); // 0 to 9999
+      final candidateId = '$prefix${number.toString().padLeft(4, '0')}';
+
+      final existing = await SupabaseService.client
+          .from('user_profiles')
+          .select('custom_user_id')
+          .eq('custom_user_id', candidateId)
+          .maybeSingle();
+
+      if (existing == null) {
+        return candidateId; // Unique!
+      }
+    }
+
+    throw Exception('failed_generate_id'.tr());
   }
 }
