@@ -7,6 +7,8 @@ import 'package:logistics_toolkit/services/intent_parser.dart';
 import 'package:logistics_toolkit/services/shipment_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../features/auth/services/supabase_service.dart';
+
 class ChatMessage {
   final String text;
   final bool isUser;
@@ -57,6 +59,21 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
     });
   }
+
+  // this is for format language in the response.
+  String _localizeReply({
+    required String langCode,
+    required String hiText,
+    required String enText,
+  }) {
+    // Gemini se "hi" aaega Hindi/Hinglish ke liye, "en" English ke liye
+    if (langCode == 'hi') {
+      return hiText;
+    } else {
+      return enText;
+    }
+  }
+
 
   void toggleTts() {
     ttsEnabled = !ttsEnabled;
@@ -112,6 +129,13 @@ class ChatProvider extends ChangeNotifier {
       if (parsed.action == 'open_screen'){
         final screen = params['screen']?.toString() ?? '';
 
+        if (screen == "track_trucks") {
+          final user = await SupabaseService.getCurrentUser();
+          final customUid = await SupabaseService.getCustomUserId(user!.id);
+
+          params['truckOwnerId'] = customUid;
+        }
+
         if (screen.isNotEmpty) {
           buttonLabel = 'open ${screen}';
           buttonScreen = screen;
@@ -126,121 +150,133 @@ class ChatProvider extends ChangeNotifier {
           final response = await ShipmentService.getAllMyShipments();
           final count = (response as List).length;
           final active_shipment_ids = filterIdsByMap(response, 'shipment_id');
-          replyText = 'Aapki $count shipments abhi active hain.\nActive Shipments IDs: ${active_shipment_ids.join(",")}';
+          replyText = _localizeReply(
+            langCode: parsed.language,
+            hiText: 'Aapki $count shipments abhi active hain.\nActive Shipments IDs: ${active_shipment_ids.join(",")}',
+            enText: 'You currently have $count active shipments.\nActive shipment IDs: ${active_shipment_ids.join(",")}',
+          );
           break;
 
       //GET COMPLETED SHIPMENTS
         case 'get_completed_shipments':
           final response = await ShipmentService.getAllMyCompletedShipments();
           final completed = (response as List).length;
-          replyText = 'Aapke $completed shipments complete ho chuke hain.';
+          replyText = _localizeReply(
+            langCode: parsed.language,
+            hiText: 'Aapke $completed shipments complete ho chuke hain.',
+            enText: '$completed of your shipments have been completed.',
+          );
           break;
 
       //GET SHARED SHIPMENTS
         case 'get_shared_shipments':
           final response = await ShipmentService.getSharedShipments();
-          final shipment_ids = response.map((singleShipment) => singleShipment['shipment_id']).toList();
-          if(shipment_ids.length == 0){
-            replyText = 'koi bhi shipment shared nahi hai';
-          }
-          else {
-            replyText = 'Apke paas ${shipment_ids
-                .length} shipments abhi shared hain.\nShipments Id:${shipment_ids
-                .join(",")}';
-          }
-          break;
-
-
-
-
-      //GET MARKETPLACE SHIPMENTS
-        case 'get_marketplace_shipments':
-          final list = await ShipmentService.getAvailableMarketplaceShipments();
-          final market_place_shipments_ids = filterIdsByMap(list, "shipment_id");
-          replyText = "${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${market_place_shipments_ids.join(",")}";
-          break;
-
-
-
-        //GET SHIPMENTS BY STATUS
-        case 'get_shipments_by_status':
-          final response = ShipmentService.getShipmentsByStatus(
-            statuses: params["status"],
-          );
-          final count = (response as List).length;
-          // final json = jsonEncode( response);
-          var shipment_ids = filterIdsByMap(await response , "shipment_id");
-          replyText = 'Aapki $count shipments ${params["status"]} hain.\nShipment IDs: ${shipment_ids.join(",")}';
-          break;
-
-        //GET AVAILABLE TRUCKS
-        case 'get_available_trucks':
-          final response = await ShipmentService.getAvailableTrucks();
-          final truck_numbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
-          if(truck_numbers.length == 0){
-            replyText = '${response.length} trucks abhi khali hain';
-          }
-          else {
-            replyText = '${response
-                .length} trucks abhi khali hain.\nTrucks Number:${truck_numbers
-                .join(",")}';
+          final shipmentIds = response.map((singleShipment) => singleShipment['shipment_id']).toList();
+          if (shipmentIds.isEmpty) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Koi bhi shipment shared nahi hai.',
+              enText: 'You do not have any shared shipments.',
+            );
+          } else {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              'Aapke paas ${shipmentIds.length} shipments abhi shared hain.\nShipments IDs: ${shipmentIds.join(",")}',
+              enText:
+              'You currently have ${shipmentIds.length} shared shipments.\nShipment IDs: ${shipmentIds.join(",")}',
+            );
           }
           break;
+
 
       //GET ALL TRUCKS
         case 'get_my_trucks':
           final response = await ShipmentService.getAllTrucks();
-          final truck_numbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
-          if(truck_numbers.length == 0){
-            replyText = '${response.length} trucks hain';
-          }
-          else {
-            replyText = '${response
-                .length} trucks  hain.\nTrucks Number:${truck_numbers
-                .join(",")}';
-          }
-          break;
-
-        //GET AVAILABLE TRUCKS
-        case 'get_on_trip_trucks':
-          final res = await supabase
-              .from('trucks')
-              .select()
-              .eq('status', 'on_trip');
-          final count = (res as List).length;
-          replyText = '$count trucks abhi trip pr hain.';
-          break;
-
-
-
-        //GET DRIVER DETAILS BY DRIVER_ID
-        case 'get_driver_details':
-          final driverId = params['driver_id']?.toString();
-          if (driverId != null && driverId.isNotEmpty) {
-            final res = await supabase
-                .from('drivers')
-                .select()
-                .eq('id', driverId)
-                .maybeSingle();
-            if (res == null)
-              replyText = 'Driver not found.';
-            else
-              replyText =
-                  'Driver ${res['name']}, phone: ${res['phone'] ?? 'N/A'}';
+          final truckNumbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
+          if (truckNumbers.isEmpty) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Aapke paas abhi 0 trucks registered hain.',
+              enText: 'You currently have 0 registered trucks.',
+            );
           } else {
-            replyText = 'Driver id missing.';
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              '${response.length} trucks hain.\nTrucks Numbers: ${truckNumbers.join(",")}',
+              enText:
+              'You have ${response.length} trucks.\nTruck numbers: ${truckNumbers.join(",")}',
+            );
           }
           break;
 
-        case 'get_status_by_shipment_id':
-          final ids = params['shipment_id'];
+      //GET AVAILABLE TRUCKS
+        case 'get_available_trucks':
+          final response = await ShipmentService.getAvailableTrucks();
+          final truckNumbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
+          if (truckNumbers.isEmpty) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Abhi koi bhi truck khali nahi hai.',
+              enText: 'There are currently no available (empty) trucks.',
+            );
+          } else {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              '${response.length} trucks abhi khali hain.\nTrucks Numbers: ${truckNumbers.join(",")}',
+              enText:
+              '${response.length} trucks are currently available.\nTruck numbers: ${truckNumbers.join(",")}',
+            );
+          }
+          break;
 
-          if (ids == null || ids.isEmpty) {
+      //GET SHIPMENTS BY STATUS
+        case 'get_shipments_by_status':
+          final response = await ShipmentService.getShipmentByStatus(
+            status: params["status"],
+          );
+
+          print("STATUS FROM CHAT PROVIDERa: '${params["status"]}'");
+
+
+          final totalShipments = response.map((shipment) => shipment['shipment_id']).toList() ;
+          print("STATUS FROM CHAT PROVIDERb: '${totalShipments.length}'");
+
+          final statusLabel = params['status'];
+
+          if (totalShipments.isEmpty) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              'Abhi 0 shipments "$statusLabel" status me hain.',
+              enText:
+              'You currently have 0 shipments with status "$statusLabel".',
+            );
+          } else {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              '${totalShipments.length} shipments abhi "$statusLabel" status me hain.\nShipment IDs: ${totalShipments.join(",")}',
+              enText:
+              'You currently have ${totalShipments.length} shipments with status "$statusLabel".\nShipment IDs: ${totalShipments.join(",")}',
+            );
+          }
+          break;
+
+      //  GET STATUS BY SHIPMENT ID
+        case 'get_status_by_shipment_id':
+          final id = params['shipment_id'];
+
+          print("shipmentid in the chatprobider : $id");
+
+          if (id == null || id.isEmpty) {
             replyText = "Shipment ID batao.";
             break;
           }
 
-          final shipmentId = ids.first.toString();
+          final shipmentId = id;
 
           try {
             final status = await ShipmentService.getStatusByShipmentId(
@@ -248,31 +284,162 @@ class ChatProvider extends ChangeNotifier {
             );
 
             if (status == null) {
-              replyText = "$shipmentId ka koi status nahi mila.";
+              replyText = _localizeReply(
+                langCode: parsed.language,
+                hiText: '$shipmentId ka koi status nahi mila.',
+                enText: 'No status found for $shipmentId.',
+              );
             } else {
-              replyText = "$shipmentId ka status: $status hai.";
+              replyText = _localizeReply(
+                langCode: parsed.language,
+                hiText: '$shipmentId ka status: $status hai.',
+                enText: 'The status of $shipmentId is: $status.',
+              );
             }
           } catch (e) {
-            replyText = "Status fetch karne me error aaya.";
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Status fetch karne me error aaya.',
+              enText: 'There was an error while fetching the status.',
+            );
           }
           break;
 
+      //GET ALL DRIVERS
+        case 'get_all_drivers':
+          final response = await ShipmentService.getAllDrivers();
+          final driverNumbers = response.map((driver) => driver['driver_custom_id']).toList() ;
+          if (driverNumbers.isEmpty) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Abhi 0 drivers registered hain.',
+              enText: 'There are currently 0 registered drivers.',
+            );
+          } else {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              '${driverNumbers.length} drivers hain.\nDriver Numbers: ${driverNumbers.join(",")}',
+              enText:
+              'You have ${driverNumbers.length} drivers.\nDriver IDs: ${driverNumbers.join(",")}',
+            );
+          }
+          break;
+
+      //GET DRIVER DETAILS
+        case 'get_driver_details':
+          final driverId = params['driver_id'];
+          if (driverId == null) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Driver ID empty hai.',
+              enText: 'Driver ID is empty.',
+            );
+            return;
+          }
+          final response =
+          await ShipmentService.getDriverDetails(userId: driverId);
+          final name = response['name'];
+          final email = response['email'];
+          final role = response['role'];
+
+          replyText = _localizeReply(
+            langCode: parsed.language,
+            hiText:
+            'Driver details:\nNaam: $name\nEmail: $email\nRole: $role',
+            enText:
+            'Driver details:\nName: $name\nEmail: $email\nRole: $role',
+          );
+          break;
 
 
+      //GET TRACK TRUCKS
+        case 'track_trucks':
+          final response = await ShipmentService.getTrackTrucks(
+            truckId: params['truck_number'],
+          );
+          if (response == null) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Truck nahi mila.',
+              enText: 'Truck not found.',
+            );
+          } else {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Aapka truck abhi $response me hai.',
+              enText: 'Your truck is currently at $response.',
+            );
+          }
+          break;
 
+      //GET MARKETPLACE SHIPMENTS
+        case 'get_marketplace_shipment':
+          final list =
+          await ShipmentService.getAvailableMarketplaceShipments();
+          final marketPlaceShipmentsIds =
+          filterIdsByMap(list, "shipment_id");
+
+          replyText = _localizeReply(
+            langCode: parsed.language,
+            hiText:
+            '${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${marketPlaceShipmentsIds.join(",")}',
+            enText:
+            'There are ${list.length} marketplace shipments available.\nShipment IDs: ${marketPlaceShipmentsIds.join(",")}',
+          );
+          break;
+
+
+      // //GET TRACK TRUCKS
+      //   case 'track_trucks':
+      //     final response = await ShipmentService.getTrackTrucks(truckId: params['truck_number']);
+      //     if(response == null){
+      //       replyText = 'truck is not found';
+      //     }
+      //     else {
+      //       replyText = 'Apka truck abhi $response me hai';
+      //     }
+      //     break;
+      //
+      //
+      // //GET MARKETPLACE SHIPMENTS
+      //   case 'get_marketplace_shipment':
+      //     final list = await ShipmentService.getAvailableMarketplaceShipments();
+      //     final market_place_shipments_ids = filterIdsByMap(list, "shipment_id");
+      //     replyText = "${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${market_place_shipments_ids.join(",")}";
+      //     break;
+
+          // OPEN SCREEN
         case 'open_screen':
           final screen = params['screen']?.toString() ?? '';
           replyText = parsed.reply.isNotEmpty
               ? parsed.reply
-              : 'Opening $screen';
+              : _localizeReply(
+            langCode: parsed.language,
+            hiText: '$screen screen open kar raha hoon.',
+            enText: 'Opening $screen screen.',
+          );
+
           if (screen.isNotEmpty) {
-            // include navigation button in message; also call onNavigate optionally
-            buttonLabel = 'Go to $screen';
+            buttonLabel = _localizeReply(
+              langCode: parsed.language,
+              hiText: 'Go to $screen',
+              enText: 'Go to $screen',
+            );
             buttonScreen = screen;
           }
           break;
         default:
           // unknown: model may already have included a helpful reply
+          if (replyText.isEmpty) {
+            replyText = _localizeReply(
+              langCode: parsed.language,
+              hiText:
+              'Mujhe ye request clear nahi hui, aap shipments, trucks ya drivers se related sawal puch sakte ho.',
+              enText:
+              'I could not clearly understand this request. You can ask about your shipments, trucks or drivers.',
+            );
+          }
           break;
       }
 
@@ -296,7 +463,14 @@ class ChatProvider extends ChangeNotifier {
       // }
     } catch (e) {
       addBotMessage(
-        ChatMessage(text: 'Service error: ${e.toString()}', isUser: false),
+        ChatMessage(text: _localizeReply(
+          langCode: 'en',
+          hiText:
+          'Mujhe samajhne me dikkat aa rahi hai, dubara simple shabdon me likho.',
+          enText:
+          'I am having trouble understanding this, please try again in simpler words.',
+        )
+          , isUser: false),
       );
       print(e);
     } finally {

@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import "../services/user_data_service.dart";
 
@@ -58,26 +60,38 @@ class ShipmentService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getShipmentsByStatus({
-    required List<String> statuses,
-    String? searchQuery,
+  static Future<List<Map<String, dynamic>>> getShipmentByStatus({
+    required String status,
   }) async {
     try {
-      var query = Supabase.instance.client
-          .from('shipment')
-          .select()
-          .inFilter('booking_status', statuses);
-      if (searchQuery != null && searchQuery.isNotEmpty) {
-        final q = searchQuery.toLowerCase();
-        query = query.or(
-          'shipment_id.ilike.%$q%,pickup.ilike.%$q%,drop.ilike.%$q%',
-        );
+
+      print("STATUS FROM CHAT PROVIDERd: '${status}'");
+
+      final customUserId = await UserDataService.getCustomUserId();
+
+      if (customUserId == null) {
+        throw Exception("User not logged in or has no custom ID");
       }
-      final response = await query.order('created_at', ascending: false);
+
+      var query = await _supabase
+          .from('shipment')
+          .select('*, shipper:user_profiles!fk_shipper_custom_id(name)')
+          .eq('assigned_agent', customUserId)
+          .eq('booking_status', status);
+
+
+      final response =  query;
+      print("STATUS FROM CHAT PROVIDERe: '${response.length}'");
+
+      dev.log("Yo message", name: "ShipmentService");
+
+
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error in getShipmentsByStatus: $e');
-      throw Exception('Failed to fetch shipments by status.');
+      print("STATUS FROM CHAT PROVIDERf: '${e}'");
+
+      print("Error fetching shipments by status: $e");
+      rethrow;
     }
   }
 
@@ -212,15 +226,76 @@ class ShipmentService {
     }
   }
 
-  static Future<void> getTrackTrucks() async {
-    try{
 
+    static Future<String?> getTrackTrucks({
+      required String truckId,
+    }) async {
+      try {
+        final customUserId = await UserDataService.getCustomUserId();
+        if (customUserId == null) {
+          throw Exception("User not logged in or has no custom ID");
+        }
+
+        final response = await _supabase
+            .from('trucks')
+            .select('current_location')
+            .eq('truck_admin', customUserId)
+            .eq('truck_number', truckId)
+            .maybeSingle();
+
+        if (response == null) return null;
+
+        return response['current_location']?.toString();
+      } catch (e) {
+        print("Error getting truck location: $e");
+        rethrow;
+      }
     }
-    catch(e){
-      print("Error fetching shared shipments: $e");
+
+
+  static Future<List<Map<String, dynamic>>> getAllDrivers() async {
+    try {
+      final customUserId = await UserDataService.getCustomUserId();
+      if (customUserId == null) {
+        throw Exception("User not logged in or has no custom ID");
+      }
+
+      final response = await _supabase
+          .from('driver_relation')
+          .select('driver_custom_id')
+          .eq('owner_custom_id', customUserId); // All trucks of current user
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print("Error getting trucks: $e");
       rethrow;
     }
   }
+
+
+  static Future<Map<String, dynamic>> getDriverDetails(
+      {required String userId}
+      ) async {
+    try {
+
+      if(userId.isEmpty){
+        throw Exception("Driver custom Id is null");
+      }
+
+  final profileResponse = await _supabase
+      .from('user_profiles')
+      .select('name, email,role')
+     // .eq('owner_custom_id', customUserId)
+      .eq('custom_user_id', userId)
+      .single();
+
+      return Map<String, dynamic>.from(profileResponse);
+    } catch (e) {
+      print("Error getting trucks: $e");
+      rethrow;
+    }
+  }
+
 
 
 

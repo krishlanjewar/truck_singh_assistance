@@ -1,18 +1,23 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:logistics_toolkit/features/Report%20Analysis/report_chart.dart';
 import 'package:logistics_toolkit/features/auth/services/supabase_service.dart';
 import 'package:logistics_toolkit/features/driver_documents/driver_documents_page.dart';
 import 'package:logistics_toolkit/features/laod_assignment/presentation/screen/allLoads.dart';
 import 'package:logistics_toolkit/features/mytruck/mytrucks.dart';
+import 'package:logistics_toolkit/features/notifications/presentation/screen/notification_center.dart';
+import 'package:logistics_toolkit/features/settings/presentation/screen/notificationDetails_page.dart';
 import 'package:logistics_toolkit/features/tracking/tracktruckspage.dart';
 import 'package:logistics_toolkit/features/trips/myTrips.dart';
 import 'package:logistics_toolkit/features/trips/myTrips_history.dart';
+import 'package:logistics_toolkit/services/shipment_service.dart';
 
 import '../features/bilty/shipment_selection_page.dart';
 import '../features/chat/agent_chat_list_page.dart';
 import '../features/complains/mycomplain.dart';
 import '../features/mydrivers/mydriver.dart';
 import '../features/ratings/presentation/screen/trip_ratings.dart';
+import '../features/settings/presentation/screen/settings_page.dart';
 import '../features/tracking/shared_shipments_page.dart';
 import '../features/truck_documents/truck_documents_page.dart';
 
@@ -36,23 +41,22 @@ Future<void> openScreen(String? screen, context, Map params) async {
       );
       break;
 
-    case "track_truck":
-     // final truckOwnerIdList = params["truck_owner_id"];
-     // final truckOwnerId = (truckOwnerIdList is List && truckOwnerIdList.isNotEmpty) ? truckOwnerIdList.first : null;
-     //
-     // if(truckOwnerId == null){
-     //   print("truckOwnerId: $truckOwnerId is null");
-     //   break;
-     // }
+    case "track_trucks":
 
-       Navigator.push(
-         context,
-         MaterialPageRoute(
-           builder: (_) =>
-               TrackTrucksPage(truckOwnerId: params["truck_owner_id"]),
-         ),
-       );
 
+      final truckOwnerId = params['truckOwnerId'];
+
+      if (truckOwnerId == null) {
+        print("TRACK ERROR: truckOwnerId not found");
+        return;
+      }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                TrackTrucksPage(truckOwnerId: truckOwnerId),
+          ),
+        );
       break;
 
     case "my_trucks":
@@ -115,6 +119,28 @@ Future<void> openScreen(String? screen, context, Map params) async {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ComplaintHistoryPage()),
+      );
+      break;
+
+
+    case "setting":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SettingsPage()),
+      );
+      break;
+
+    case "notification":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const NotificationCenterPage()),
+      );
+      break;
+
+    case "report_and_analysis":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ReportAnalysisPage()),
       );
       break;
   }
