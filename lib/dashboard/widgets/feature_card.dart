@@ -1,4 +1,3 @@
-// File: lib/widgets/feature_card.dart
 import 'package:flutter/material.dart';
 
 class FeatureCard extends StatelessWidget {
@@ -28,7 +27,7 @@ class FeatureCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               //color: Colors.grey.withOpacity(0.1),
-              color: Theme.of(context).shadowColor.withOpacity(0.1),
+              color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -43,7 +42,7 @@ class FeatureCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(icon, color: color, size: 28),

@@ -37,13 +37,17 @@ class RealTimeNotificationService {
     const initSettings =
     InitializationSettings(android: androidSettings, iOS: iosSettings);
 
-    await _localNotifications.initialize(initSettings,
-        onDidReceiveNotificationResponse: _onNotificationTapped);
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
+
     _isInitialized = true;
   }
 
   void onAppLifecycleChanged(AppLifecycleState state) {
-    _isAppInForeground = (state == AppLifecycleState.resumed);
+    _isAppInForeground = state == AppLifecycleState.resumed;
+
     if (_isAppInForeground) {
       _startRealtimeListening();
     } else {
@@ -59,7 +63,9 @@ class RealTimeNotificationService {
 
   void _stopRealtimeListening() {
     if (_notificationChannel != null) {
-      Supabase.instance.client.removeChannel(_notificationChannel!);
+      try {
+        Supabase.instance.client.removeChannel(_notificationChannel!);
+      } catch (_) {}
       _notificationChannel = null;
     }
   }
@@ -85,12 +91,16 @@ class RealTimeNotificationService {
     try {
       final supabase = Supabase.instance.client;
       _notificationChannel = supabase
-          .channel('public:notifications:user_id=eq.$_currentUserId')
+          .channel('public:notifications:user_id=eq.${_currentUserId!}')
           .onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
         table: 'notifications',
-        callback: _handleNewNotificationPayload,
+        callback: (payload) {
+          final record =
+              payload.newRecord ?? <String, dynamic>{};
+          _processNotification(record);
+        },
       );
       _notificationChannel!.subscribe();
     } catch (e) {
@@ -103,30 +113,20 @@ class RealTimeNotificationService {
     _currentUserId = null;
   }
 
-  void _handleNewNotificationPayload(PostgresChangePayload payload) {
-    _processNotification(payload.newRecord);
-  }
-
   void _processNotification(Map<String, dynamic> notification) {
     try {
-      final notificationId = notification['id'] as String?;
-      if (notificationId == null ||
-          _processedNotificationIds.contains(notificationId)) {
-        return;
-      }
-
+      final notificationId = notification['id']?.toString();
+      if (notificationId == null) return;
+      if (_processedNotificationIds.contains(notificationId)) return;
       final now = DateTime.now();
       final lastProcessed = _notificationTimestamps[notificationId];
       if (lastProcessed != null &&
           now.difference(lastProcessed).inSeconds < 10) {
         return;
       }
-
       _processedNotificationIds.add(notificationId);
       _notificationTimestamps[notificationId] = now;
-
       _notificationController.add(notification);
-
       _showLocalNotification(notification);
     } catch (e) {
       debugPrint('Error processing notification: $e');
@@ -136,26 +136,24 @@ class RealTimeNotificationService {
   Future<void> checkForNewNotifications({required String userId}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final lastCheck = prefs.getString('last_notification_check_$userId');
+      final lastCheck =
+          prefs.getString('last_notification_check_$userId') ??
+              DateTime.now()
+                  .subtract(const Duration(minutes: 20))
+                  .toIso8601String();
+
       final now = DateTime.now().toIso8601String();
 
       final supabase = Supabase.instance.client;
+
       final response = await supabase
           .from('notifications')
           .select()
           .eq('user_id', userId)
-          .gte(
-        'created_at',
-        lastCheck ??
-            DateTime.now()
-                .subtract(const Duration(minutes: 20))
-                .toIso8601String(),
-      );
+          .gte('created_at', lastCheck);
 
-      if (response.isNotEmpty) {
-        for (final notification in response) {
-          _processNotification(notification);
-        }
+      for (final notification in response) {
+        _processNotification(notification);
       }
 
       await prefs.setString('last_notification_check_$userId', now);
@@ -164,23 +162,25 @@ class RealTimeNotificationService {
     }
   }
 
-  Future<void> _showLocalNotification(Map<String, dynamic> notification) async {
+  Future<void> _showLocalNotification(
+      Map<String, dynamic> notification) async {
     try {
       const androidDetails = AndroidNotificationDetails(
         'alerts_channel',
-        'shipment_alerts_title', // localized with tr()
-        channelDescription: 'shipment_alerts_description', // localized with tr()
+        'shipment_alerts_title',
+        channelDescription: 'shipment_alerts_description',
         importance: Importance.high,
         priority: Priority.high,
         enableVibration: true,
         playSound: true,
       );
+
       const details = NotificationDetails(android: androidDetails);
 
       await _localNotifications.show(
         notification['id'].hashCode,
-        notification['title'] as String? ?? tr('new_notification'),
-        notification['message'] as String? ?? tr('empty_message'),
+        notification['title']?.toString() ?? tr('new_notification'),
+        notification['message']?.toString() ?? tr('empty_message'),
         details,
         payload: notification['id']?.toString(),
       );

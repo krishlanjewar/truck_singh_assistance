@@ -28,26 +28,37 @@ class ScheduleStep extends StatelessWidget {
     required this.onPrivateChanged,
     required this.onChanged,
     required this.progressBar,
-    this.pickupDate,
+    required this.pickupDate,
     required this.onPickupDatePick,
   }) : super(key: key);
 
-  Widget _requiredTextField(TextEditingController controller, String label,
-      {bool isNumeric = false}) {
+  /// Required Text Field (Material 3 compliant)
+  Widget _requiredTextField(
+      TextEditingController controller,
+      String label, {
+        bool isNumeric = false,
+      }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Text('$label *',
-              style:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          child: Text(
+            '$label *',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
         ),
         TextFormField(
           controller: controller,
-          keyboardType:
-          isNumeric ? TextInputType.number : TextInputType.text,
-          decoration: InputDecoration(hintText: 'Enter $label'),
+          keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+          decoration: InputDecoration(
+            hintText: 'Enter $label',
+            border: const OutlineInputBorder(),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 14,
+              horizontal: 12,
+            ),
+          ),
           validator: (val) =>
           val == null || val.trim().isEmpty ? 'Enter $label' : null,
           onChanged: (_) => onChanged(),
@@ -60,153 +71,141 @@ class ScheduleStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        progressBar,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          progressBar,
 
-        /// Title
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text('scheduleDetails'.tr(),
-              style:
-              const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-        ),
-
-        const SizedBox(height: 10),
-
-        /// Delivery Date
-        ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.calendar_today, color: Colors.orange),
-          ),
-          title: Text(
-            selectedDate == null
-                ? 'selectDeliveryDate'.tr()
-                : 'deliveryPrefix'.tr(namedArgs: {
-              "date": DateFormat('MMM dd, yyyy').format(selectedDate!)
-            }),
-            style: TextStyle(
-                //color: selectedDate == null ? Colors.red : Colors.black87,
-                fontWeight: FontWeight.w600),
-          ),
-          subtitle: selectedDate == null
-              ? Text('tapChooseDate'.tr())
-              : Text(
-              '${selectedDate!.difference(DateTime.now()).inDays + 1} days from now'),
-          onTap: onDatePick,
-        ),
-
-        const Divider(height: 1),
-
-        /// Pickup Date
-        ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.green.shade100,
-            child: Icon(Icons.event, color: Colors.green.shade700),
-          ),
-          title: Text(
-            pickupDate == null
-                ? 'selectPickupDate'.tr()
-                : 'pickupPrefix'.tr(namedArgs: {
-              "date": DateFormat('MMM dd, yyyy').format(pickupDate!)
-            }),
-            style: TextStyle(
-              //color: pickupDate == null ? Colors.red : Colors.black87,
-              fontWeight: FontWeight.w600,
+          /// Title
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              'scheduleDetails'.tr(),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
           ),
-          subtitle: pickupDate == null
-              ? Text('tapChoosePickupDate'.tr())
-              : Text('${pickupDate!.difference(DateTime.now()).inDays} days from now'),
-          onTap: onPickupDatePick,
-        ),
 
-        const Divider(height: 1),
+          const SizedBox(height: 10),
 
-        /// Pickup Time
-        ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
+          /// Delivery Date
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.calendar_today, color: Colors.orange),
+            ),
+            title: Text(
+              selectedDate == null
+                  ? 'selectDeliveryDate'.tr()
+                  : 'deliveryPrefix'.tr(namedArgs: {
+                "date": DateFormat('MMM dd, yyyy').format(selectedDate!)
+              }),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: selectedDate == null
+                ? Text('tapChooseDate'.tr())
+                : Text(
+              '${selectedDate!.difference(DateTime.now()).inDays + 1} days from now',
+            ),
+            onTap: onDatePick,
+          ),
+
+          const Divider(height: 1),
+
+          /// Pickup Date
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.green.shade100,
+              child: Icon(Icons.event, color: Colors.green.shade700),
+            ),
+            title: Text(
+              pickupDate == null
+                  ? 'selectPickupDate'.tr()
+                  : 'pickupPrefix'.tr(namedArgs: {
+                "date": DateFormat('MMM dd, yyyy').format(pickupDate!)
+              }),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: pickupDate == null
+                ? Text('tapChoosePickupDate'.tr())
+                : Text('${pickupDate!.difference(DateTime.now()).inDays} days from now'),
+            onTap: onPickupDatePick,
+          ),
+
+          const Divider(height: 1),
+
+          /// Pickup Time
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
                 color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.access_time, color: Colors.blue),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.access_time, color: Colors.blue),
+            ),
+            title: Text(
+              pickupTime == null
+                  ? 'selectPickupTime'.tr()
+                  : 'pickupTimePrefix'.tr(namedArgs: {"time": pickupTime!}),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text('preferredPickupTime'.tr()),
+            onTap: onTimePick,
           ),
-          title: Text(
-            pickupTime == null
-                ? 'selectPickupTime'.tr()
-                : 'pickupTimePrefix'.tr(namedArgs: {"time": pickupTime!}),
-            style: TextStyle(
-                //color: pickupTime == null ? Colors.red : Colors.black87,
-                fontWeight: FontWeight.w600),
+
+          const SizedBox(height: 20),
+
+          /// Material Inside
+          _requiredTextField(materialController, 'materialInside'.tr()),
+
+          const SizedBox(height: 16),
+
+          /// Special Instructions
+          Text(
+            'specialInstructions'.tr(),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
           ),
-          subtitle: Text('preferredPickupTime'.tr()),
-          onTap: onTimePick,
-        ),
+          const SizedBox(height: 8),
 
-        const SizedBox(height: 20),
-
-        /// Material Inside
-        _requiredTextField(materialController, 'materialInside'.tr()),
-
-        const SizedBox(height: 16),
-
-        /// Special Instructions
-        Text('specialInstructions'.tr(),
-            style:
-            const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 8,
-                  offset: const Offset(0, 2))
-            ],
-          ),
-          child: TextFormField(
+          TextFormField(
             controller: notesController,
+            maxLines: 4,
             decoration: InputDecoration(
               hintText: 'specialInstructionsHint'.tr(),
               filled: true,
-              //fillColor: Colors.white,
-              border: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12))),
-              enabledBorder: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12))),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               focusedBorder: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Colors.orange, width: 2)),
+                borderSide: BorderSide(color: Colors.orange, width: 2),
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
               contentPadding: const EdgeInsets.all(16),
             ),
-            maxLines: 4,
-            keyboardType: TextInputType.multiline,
             onChanged: (_) => onChanged(),
           ),
-        ),
 
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
 
-        /// Checkbox
-        CheckboxListTile(
-          title: Text('makeShipmentPrivate'.tr()),
-          subtitle: Text('makeShipmentPrivateSub'.tr()),
-          value: isPrivate,
-          onChanged: onPrivateChanged,
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          checkboxShape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          dense: true,
-          visualDensity: const VisualDensity(horizontal: 1, vertical: 1),
-        ),
-      ]),
+          /// Make Shipment Private
+          CheckboxListTile(
+            value: isPrivate,
+            onChanged: onPrivateChanged,
+            title: Text('makeShipmentPrivate'.tr()),
+            subtitle: Text('makeShipmentPrivateSub'.tr()),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            checkboxShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            visualDensity: const VisualDensity(vertical: -1, horizontal: -3),
+          ),
+        ],
+      ),
     );
   }
 }

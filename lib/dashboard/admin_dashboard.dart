@@ -1,14 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/theme.dart';
 import '../features/complains/mycomplain.dart';
 import '../widgets/common/app_bar.dart';
 import 'widgets/feature_card.dart';
 import '../features/admin/manage_shipments_page.dart';
-import '../features/admin/manage_trucks_page.dart';
 import '../features/admin/manage_users_page.dart';
 import '../features/admin/support_ticket_list_page.dart';
 import '../features/admin/admin_user_management_page.dart';
@@ -133,7 +131,7 @@ class AdminService {
         .eq('user_id', user.id)
         .single();
 
-    if (response == null) throw Exception("Profile not found");
+    if (response.isEmpty) throw Exception("Profile not found");
     return response;
   }
 
@@ -291,7 +289,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.teal.withOpacity(0.3),
+            color: AppColors.teal.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),

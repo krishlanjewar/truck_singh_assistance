@@ -6,7 +6,11 @@ class Place {
   final double lat;
   final double lng;
 
-  Place({required this.description, required this.lat, required this.lng});
+  Place({
+    required this.description,
+    required this.lat,
+    required this.lng,
+  });
 }
 
 class AddressStep extends StatelessWidget {
@@ -29,30 +33,51 @@ class AddressStep extends StatelessWidget {
     required this.progressBar,
   }) : super(key: key);
 
-  Widget _addressField(String label, Place? place, VoidCallback onSearch, VoidCallback onMapPick) {
+  Widget _addressField(
+      String label,
+      Place? place,
+      VoidCallback onSearch,
+      VoidCallback onMapPick,
+      ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Text('$label *', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          child: Text(
+            "$label *",
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
         ),
+
+        /// Selectable address field
         InkWell(
           onTap: onSearch,
           child: Container(
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: InputDecorator(
               decoration: InputDecoration(
                 suffixIcon: IconButton(
                   onPressed: onMapPick,
                   tooltip: 'select_on_map'.tr(),
                   icon: const Icon(Icons.location_on),
+                  color: Colors.orange,
                 ),
-                suffixIconColor: Colors.orange,
-                contentPadding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 10.0),
                 border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 15,
+                  horizontal: 10,
+                ),
               ),
-              child: Text(place?.description ?? 'tap_to_select_address'.tr(), style: const TextStyle(fontSize: 16)),
+              child: Text(
+                place?.description ?? 'tap_to_select_address'.tr(),
+                style: const TextStyle(fontSize: 16),
+              ),
             ),
           ),
         ),
@@ -63,17 +88,39 @@ class AddressStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        progressBar,
-         Padding(
-          padding: EdgeInsets.all(8.0),
-          child: Text('pickup_delivery'.tr(), style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-        ),
-        const SizedBox(height: 10),
-        _addressField('pickup_location'.tr(), pickupPlace, onPickupSearch, onPickupMapPick),
-        const SizedBox(height: 20),
-        _addressField('dropoff_location'.tr(), dropPlace, onDropSearch, onDropMapPick),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          progressBar,
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              'pickup_delivery'.tr(),
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          _addressField(
+            'pickup_location'.tr(),
+            pickupPlace,
+            onPickupSearch,
+            onPickupMapPick,
+          ),
+
+          const SizedBox(height: 20),
+
+          _addressField(
+            'dropoff_location'.tr(),
+            dropPlace,
+            onDropSearch,
+            onDropMapPick,
+          ),
+        ],
+      ),
     );
   }
 }

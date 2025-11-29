@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'complain_screen.dart';
@@ -15,7 +14,6 @@ class ComplaintDetailsPage extends StatefulWidget {
 
 class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
   late Map<String, dynamic> _currentComplaint;
-  String? _currentUserRole;
   bool _isActionLoading = false;
   bool _isLoading = true;
   RealtimeChannel? _complaintChannel;
@@ -36,31 +34,12 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
   }
 
   Future<void> _initializePage() async {
-    await _fetchCurrentUserRole();
     setupRealtimeSubscription();
     if (mounted) {
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _fetchCurrentUserRole() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-
-      final profile = await Supabase.instance.client
-          .from('user_profiles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-
-      if (mounted) {
-        setState(() {
-          _currentUserRole = profile['role'];
-        });
-      }
-    } catch (_) {}
-  }
 
   void setupRealtimeSubscription() {
     final complaintId = _currentComplaint['id'];
@@ -117,7 +96,6 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
     } catch (_) {}
   }
 
-  bool _isAgent(String? role) => role == 'company' || role == 'truckowner';
 
   Future<void> _performAction(Future<void> Function() action) async {
     setState(() => _isActionLoading = true);
@@ -184,37 +162,6 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
     });
   }
 
-  Future<void> _handleAgentAction(
-      String action, String title, String eventType, String eventTitle) async {
-    final controller = TextEditingController();
-    final confirmed = await _showJustificationDialog(title, action, controller);
-
-    if (confirmed != true) return;
-
-    _performAction(() async {
-      final time = DateTime.now().toIso8601String();
-
-      final historyEvent = {
-        'type': eventType,
-        'title': eventTitle,
-        'description': controller.text.trim(),
-        'timestamp': time,
-        'user_id': Supabase.instance.client.auth.currentUser?.id,
-      };
-
-      final existing = _currentComplaint['history'] as Map? ?? {};
-      final events = List.from(existing['events'] ?? []);
-      events.add(historyEvent);
-
-      await Supabase.instance.client.from('complaints').update({
-        'status': eventTitle,
-        'agent_justification': controller.text.trim(),
-        'history': {'events': events},
-      }).eq('id', _currentComplaint['id']);
-
-      await _refreshComplaint();
-    });
-  }
 
   Future<void> _appealComplaint() async {
     final confirmed = await _showConfirmationDialog(
@@ -249,16 +196,9 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
     });
   }
 
-  // ======================================================
-  //                     UI SECTION
-  // ======================================================
-
   @override
   Widget build(BuildContext context) {
     final status = _currentComplaint['status'] ?? 'Open';
-
-    /// 🔥 NEW RULE:
-    /// User can edit anytime EXCEPT Resolved
     final isComplaintOwner =
         _currentComplaint['user_id'] ==
             Supabase.instance.client.auth.currentUser?.id;
@@ -359,10 +299,6 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
       ),
     );
   }
-
-  // ------------------------------------------------------
-  //  (Remaining UI helper widgets stay unchanged)
-  // ------------------------------------------------------
 
   Widget _buildStatusHeader() {
     final status = _currentComplaint['status'] ?? 'Unknown';
@@ -481,7 +417,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
         Column(
           children: [
             CircleAvatar(
-              backgroundColor: color.withOpacity(0.2),
+              backgroundColor: color.withValues(alpha: 0.2),
               child: Icon(icon, color: color),
             ),
             Container(height: 50, width: 2, color: Colors.grey.shade300),
@@ -581,43 +517,6 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
     );
   }
 
-  Future<bool?> _showJustificationDialog(
-      String title, String action, TextEditingController controller) {
-    return showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: "provide_justification".tr(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            child: Text("cancel".tr()),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          ElevatedButton(
-            child: Text(action),
-            onPressed: () {
-              if (controller.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("justification_empty".tr()),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              } else {
-                Navigator.pop(context, true);
-              }
-            },
-          )
-        ],
-      ),
-    );
-  }
 
   Map<String, dynamic> _getStatusConfig(String status) {
     switch (status) {

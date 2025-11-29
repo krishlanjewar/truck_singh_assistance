@@ -8,8 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 
-//other page imports
-
+// Driver model
 class Driver {
   final String id;
   final String name;
@@ -52,33 +51,26 @@ class Driver {
   }
 
   factory Driver.fromMap(Map<String, dynamic> map) {
-    final bookingStatus = (map['booking_status'] ?? 'no_shipment')
-        .toString()
-        .toLowerCase();
+    final bookingStatus =
+    (map['booking_status'] ?? 'no_shipment').toString().toLowerCase();
 
     String driverStatus;
 
-    // Driver is AVAILABLE only when:
-    // 1. They have no shipment assigned, OR
-    // 2. Their last shipment is completed
+    // AVAILABLE if no shipment or last shipment completed / delivered / cancelled
     if (bookingStatus == 'no_shipment' ||
         bookingStatus == 'completed' ||
         bookingStatus == 'delivered' ||
         bookingStatus == 'cancelled') {
       driverStatus = 'Available';
     } else {
-      // Driver is ON TRIP for all other statuses:
-      // pending, accepted, en route to pickup, arrived at pickup,
-      // loading, picked up, in transit, arrived at drop, unloading, delivered
+      // All other statuses -> On Trip
       driverStatus = 'On Trip';
     }
 
-    // --- THIS IS THE FIX ---
-    // Use the correct keys from the 'user_profiles' table
     return Driver(
       id: (map['custom_user_id'] ?? '').toString(),
-      name: map['name'] ?? 'Unknown', // Use 'name'
-      contact: map['mobile_number'] ?? '', // Use 'mobile_number'
+      name: (map['name'] ?? 'Unknown').toString(),
+      contact: (map['mobile_number'] ?? '').toString(),
       status: driverStatus,
       rating: map['avg_driver_rating'] != null
           ? double.tryParse(map['avg_driver_rating'].toString())
@@ -98,31 +90,35 @@ class MyDriverPage extends StatefulWidget {
   });
 
   @override
-  _MyDriverPageState createState() => _MyDriverPageState();
+  State<MyDriverPage> createState() => _MyDriverPageState();
 }
 
 class _MyDriverPageState extends State<MyDriverPage>
     with SingleTickerProviderStateMixin {
   final SupabaseClient supabase = Supabase.instance.client;
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
+
   List<Driver> drivers = [];
   bool isLoading = true;
   String loggedInOwnerCustomId = '';
 
   bool sortByRating = false;
   bool sortByStatus = false;
+
   int _totalDrivers = 0;
   int availableDrivers = 0;
   int onTripDrivers = 0;
   int onLeaveDrivers = 0;
+
   String selectedFilter = 'All Drivers';
   bool isFirstTime = true;
-  final ptr.RefreshController _refreshController =
-  ptr.RefreshController(initialRefresh: false);
 
   @override
   void initState() {
     super.initState();
-    // When in selection mode (assign driver), default to showing only available drivers
+
+    // When in selection mode (assign driver), default to available only
     if (widget.isSelectionMode) {
       selectedFilter = 'available_only'.tr();
     } else {
@@ -137,7 +133,9 @@ class _MyDriverPageState extends State<MyDriverPage>
     if (isFirstTime) {
       await prefs.setBool('first_time_add_driver', false);
     }
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> fetchLoggedInOwnerId() async {
@@ -150,16 +148,17 @@ class _MyDriverPageState extends State<MyDriverPage>
         .eq('user_id', user.id)
         .maybeSingle();
 
-    if (response != null) {
-      loggedInOwnerCustomId = response['custom_user_id'];
-      fetchDriversFromSupabase();
+    if (response != null && response['custom_user_id'] != null) {
+      loggedInOwnerCustomId = response['custom_user_id'] as String;
+      await fetchDriversFromSupabase();
     }
   }
 
-  // --- THIS IS THE UPDATED FUNCTION ---
+  // Fetch drivers linked to this owner + their current shipment status
   Future<void> fetchDriversFromSupabase() async {
     if (loggedInOwnerCustomId.isEmpty) return;
     setState(() => isLoading = true);
+
     try {
       // 1. Get all driver_custom_ids for this owner
       final relationResponse = await supabase
@@ -168,7 +167,7 @@ class _MyDriverPageState extends State<MyDriverPage>
           .eq('owner_custom_id', loggedInOwnerCustomId);
 
       final driverIds = relationResponse
-          .map((row) => row['driver_custom_id'] as String)
+          .map<String>((row) => row['driver_custom_id'] as String)
           .toList();
 
       if (driverIds.isEmpty) {
@@ -180,16 +179,12 @@ class _MyDriverPageState extends State<MyDriverPage>
           onLeaveDrivers = 0;
           isLoading = false;
         });
+        _refreshController.refreshCompleted();
         return;
       }
 
-      // 2. Loop through each driver ID and fetch their profile and status
-      List<Map<String, dynamic>> driversWithStatus = [];
-
-      // --- LOGIC FIX HERE ---
-      // Define all known "active" statuses. This is safer than a .not() query.
-      // We include lowercase and title-case for safety.
-      final activeStatuses = [
+      // Active statuses list
+      final activeStatuses = <String>[
         'pending',
         'accepted',
         'en route to pickup',
@@ -207,111 +202,102 @@ class _MyDriverPageState extends State<MyDriverPage>
         'Picked Up',
         'In Transit',
         'Arrived at Drop',
-        'Unloading'
+        'Unloading',
       ];
-      // --- END LOGIC FIX ---
 
-      for (var driverCustomId in driverIds) {
+      final List<Map<String, dynamic>> driversWithStatus = [];
 
-        // Fetch the driver's profile
+      for (final driverCustomId in driverIds) {
+        // Profile
         final profileResponse = await supabase
             .from('user_profiles')
             .select('name, custom_user_id, mobile_number')
             .eq('custom_user_id', driverCustomId)
-            .maybeSingle(); // Use maybeSingle to get one profile or null
+            .maybeSingle();
 
-        if (profileResponse == null) {
-          continue; // Skip if profile not found
-        }
+        if (profileResponse == null) continue;
 
-        // --- SYNTAX FIX HERE ---
-        // Find any shipment that IS IN one of the active states.
-        // We use the .filter() syntax from your driver_chat_service.dart
         final shipmentResponse = await supabase
             .from('shipment')
-            .select('booking_status') // Select FIRST
-            .eq('assigned_driver', driverCustomId) // Filter SECOND
-            .filter('booking_status', 'in', activeStatuses) // Filter THIRD
+            .select('booking_status')
+            .eq('assigned_driver', driverCustomId)
+            .filter('booking_status', 'in', activeStatuses)
             .limit(1);
-        // --- END SYNTAX FIX ---
 
-        // Add booking status to the driver's profile map
         final driverData = Map<String, dynamic>.from(profileResponse);
         if (shipmentResponse.isNotEmpty) {
-          // Driver has at least one active shipment
           driverData['booking_status'] =
-          shipmentResponse[0]['booking_status'];
+          shipmentResponse.first['booking_status'];
         } else {
-          // Driver has no active shipments
           driverData['booking_status'] = 'no_shipment';
         }
-
-        // Note: avg_driver_rating is not fetched here.
-        // If you need rating, you must add it to the 'user_profiles' select
-        // and add 'avg_driver_rating': driverProfile['avg_driver_rating']
 
         driversWithStatus.add(driverData);
       }
 
-      List<Driver> fetchedDrivers = driversWithStatus
-          .map((item) => Driver.fromMap(item as Map<String, dynamic>))
+      final fetchedDrivers = driversWithStatus
+          .map((item) => Driver.fromMap(item))
           .toList();
 
       setState(() {
         drivers = fetchedDrivers;
         _totalDrivers = drivers.length;
-        availableDrivers = fetchedDrivers
-            .where((d) => d.status == 'Available')
-            .length;
-        onTripDrivers = fetchedDrivers
-            .where((d) => d.status == 'On Trip')
-            .length;
-        onLeaveDrivers = fetchedDrivers
-            .where((d) => d.status == 'Leave')
-            .length;
+        availableDrivers =
+            fetchedDrivers.where((d) => d.status == 'Available').length;
+        onTripDrivers =
+            fetchedDrivers.where((d) => d.status == 'On Trip').length;
+        onLeaveDrivers =
+            fetchedDrivers.where((d) => d.status == 'Leave').length;
         isLoading = false;
-      });_refreshController.refreshCompleted();
+      });
+      _refreshController.refreshCompleted();
     } catch (e) {
       setState(() => isLoading = false);
       _refreshController.refreshFailed();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error fetching drivers: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching drivers: $e')),
+        );
       }
     }
   }
-  // --- END OF UPDATED FUNCTION ---
 
   List<Driver> get filteredDrivers {
     List<Driver> filtered = drivers.where((driver) {
       if (selectedFilter == 'Available Only' ||
-          selectedFilter == 'available_only'.tr())
+          selectedFilter == 'available_only'.tr()) {
         return driver.status == 'Available';
-      if (selectedFilter == 'On Trip' || selectedFilter == 'on_trip'.tr())
+      }
+      if (selectedFilter == 'On Trip' || selectedFilter == 'on_trip'.tr()) {
         return driver.status == 'On Trip';
-      if (selectedFilter == 'On Leave' || selectedFilter == 'on_leave'.tr())
+      }
+      if (selectedFilter == 'On Leave' || selectedFilter == 'on_leave'.tr()) {
         return driver.status == 'Leave';
+      }
       return true;
     }).toList();
 
     if (sortByRating) {
-      filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+      filtered.sort(
+            (a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0),
+      );
     } else if (sortByStatus) {
       final order = {'Available': 0, 'On Trip': 1, 'Leave': 2};
       filtered.sort(
-            (a, b) => (order[a.status] ?? 99).compareTo(order[b.status] ?? 99),
+            (a, b) =>
+            (order[a.status] ?? 99).compareTo(order[b.status] ?? 99),
       );
     }
+
     return filtered;
   }
 
   void _selectDriver(Driver driver) {
     if (!widget.isSelectionMode || driver.status != 'Available') return;
 
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text('confirm_driver_assignment'.tr()),
           content: Text(
@@ -319,13 +305,12 @@ class _MyDriverPageState extends State<MyDriverPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text('cancel'.tr()),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                // [FIXED] Implemented the correct logic from your reference code.
+                Navigator.of(dialogContext).pop();
                 Navigator.of(context).pop(driver.id);
               },
               child: Text('confirm'.tr()),
@@ -336,7 +321,12 @@ class _MyDriverPageState extends State<MyDriverPage>
     );
   }
 
-  Widget _buildStatCard(String label, int count, Color color, String filter) {
+  Widget _buildStatCard(
+      String label,
+      int count,
+      Color color,
+      String filter,
+      ) {
     return GestureDetector(
       onTap: () => setState(() => selectedFilter = filter),
       child: Container(
@@ -374,8 +364,22 @@ class _MyDriverPageState extends State<MyDriverPage>
     );
   }
 
+  Future<void> _callDriver(String contact) async {
+    final uri = Uri.parse('tel:${contact.trim()}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('could_not_open_dialer'.tr())),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -387,7 +391,7 @@ class _MyDriverPageState extends State<MyDriverPage>
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              showSearch(
+              showSearch<String?>(
                 context: context,
                 delegate: DriverSearchDelegate(
                   drivers,
@@ -396,14 +400,11 @@ class _MyDriverPageState extends State<MyDriverPage>
               );
             },
           ),
-          /*IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchDriversFromSupabase,
-          ),*/
           PopupMenuButton<String>(
             onSelected: (value) => setState(() {
-              sortByRating = value == 'Rating';
-              sortByStatus = value == 'Status';
+              // Compare against translated values so it works with localization
+              sortByRating = value == 'rating'.tr();
+              sortByStatus = value == 'status'.tr();
             }),
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -412,7 +413,7 @@ class _MyDriverPageState extends State<MyDriverPage>
               ),
               PopupMenuItem(
                 value: 'status'.tr(),
-                child: Text('sort_by_rating'.tr()),
+                child: Text('sort_by_status'.tr()),
               ),
             ],
           ),
@@ -425,22 +426,27 @@ class _MyDriverPageState extends State<MyDriverPage>
         children: [
           if (isFirstTime)
             Text(
-              "tap_to_add_driver".tr(),
-              style: TextStyle(fontSize: 12),
+              'tap_to_add_driver'.tr(),
+              style: const TextStyle(fontSize: 12),
             ).animate().fade().slide(),
           const SizedBox(height: 4),
           Animate(
             effects: [
-              ScaleEffect(duration: 600.ms, end: const Offset(1.1, 1.1)),
+              ScaleEffect(
+                duration: 600.ms,
+                end: const Offset(1.1, 1.1),
+              ),
             ],
             onPlay: (controller) => controller.repeat(reverse: true),
             child: FloatingActionButton(
               onPressed: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => AddDriverPage()),
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AddDriverPage(),
+                  ),
                 );
-                fetchDriversFromSupabase();
+                await fetchDriversFromSupabase();
               },
               child: const Icon(Icons.add),
             ),
@@ -452,30 +458,31 @@ class _MyDriverPageState extends State<MyDriverPage>
           : Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding:
+            const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatCard(
-                  "total".tr(),
+                  'total'.tr(),
                   _totalDrivers,
                   Colors.cyan,
                   'all_drivers'.tr(),
                 ),
                 _buildStatCard(
-                  "available".tr(),
+                  'available'.tr(),
                   availableDrivers,
                   Colors.green,
                   'available_only'.tr(),
                 ),
                 _buildStatCard(
-                  "on_trip".tr(),
+                  'on_trip'.tr(),
                   onTripDrivers,
                   Colors.blue,
                   'on_trip'.tr(),
                 ),
                 _buildStatCard(
-                  "on_leave".tr(),
+                  'on_leave'.tr(),
                   onLeaveDrivers,
                   Colors.red,
                   'on_leave'.tr(),
@@ -519,78 +526,88 @@ class _MyDriverPageState extends State<MyDriverPage>
               header: const ptr.WaterDropHeader(),
               child: filteredDrivers.isEmpty
                   ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics:
+                const AlwaysScrollableScrollPhysics(),
                 children: [
                   const SizedBox(height: 200),
                   Center(
                     child: Text(
                       'no_drivers_found'.tr(),
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                 ],
               )
                   : ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics:
+                const AlwaysScrollableScrollPhysics(),
                 itemCount: filteredDrivers.length,
                 itemBuilder: (context, index) {
                   final driver = filteredDrivers[index];
-                  final isAvailable = driver.status == 'Available';
+                  final isAvailable =
+                      driver.status == 'Available';
+
                   return Slidable(
                     key: ValueKey(driver.id),
                     endActionPane: widget.isSelectionMode
                         ? null
                         : ActionPane(
-                      motion: const ScrollMotion(),
+                      motion:
+                      const ScrollMotion(),
                       children: [
                         SlidableAction(
-                          onPressed: (context) async {
-                            final contact = driver.contact.trim();
-                            final uri = Uri.parse('tel:$contact');
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri);
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content:
-                                  Text("could_not_open_dialer".tr()),
-                                ),
-                              );
-                            }
-                          },
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
+                          onPressed: (_) =>
+                              _callDriver(
+                                driver.contact,
+                              ),
+                          backgroundColor:
+                          Colors.green,
+                          foregroundColor:
+                          Colors.white,
                           icon: Icons.call,
                           label: 'Call',
                         ),
                       ],
                     ),
                     child: Card(
-                      margin: const EdgeInsets.symmetric(
+                      margin:
+                      const EdgeInsets.symmetric(
                         vertical: 6,
                         horizontal: 10,
                       ),
                       child: ListTile(
                         onTap: () {
-                          if (widget.isSelectionMode && isAvailable) {
+                          if (widget.isSelectionMode &&
+                              isAvailable) {
                             _selectDriver(driver);
                           }
                         },
                         leading: CircleAvatar(
-                          backgroundColor:
-                          driver.statusColor.withOpacity(0.2),
-                          child: Icon(driver.statusIcon, color: driver.statusColor),
+                          backgroundColor: driver
+                              .statusColor
+                              .withOpacity(0.2),
+                          child: Icon(
+                            driver.statusIcon,
+                            color: driver.statusColor,
+                          ),
                         ),
                         title: Text(
                           '${driver.name} (${driver.id})',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.phone, size: 16),
+                                const Icon(Icons.phone,
+                                    size: 16),
                                 const SizedBox(width: 4),
                                 Text(driver.contact),
                               ],
@@ -598,10 +615,16 @@ class _MyDriverPageState extends State<MyDriverPage>
                             if (driver.rating != null)
                               Row(
                                 children: [
-                                  const Icon(Icons.star,
-                                      color: Colors.amber, size: 16),
+                                  const Icon(
+                                    Icons.star,
+                                    color: Colors.amber,
+                                    size: 16,
+                                  ),
                                   const SizedBox(width: 4),
-                                  Text(driver.rating!.toStringAsFixed(1)),
+                                  Text(
+                                    driver.rating!
+                                        .toStringAsFixed(1),
+                                  ),
                                 ],
                               ),
                           ],
@@ -609,18 +632,37 @@ class _MyDriverPageState extends State<MyDriverPage>
                         trailing: widget.isSelectionMode
                             ? (isAvailable
                             ? ElevatedButton(
-                          onPressed: () => _selectDriver(driver),
-                          child: Text('select'.tr()),
+                          onPressed: () =>
+                              _selectDriver(
+                                driver,
+                              ),
+                          child: Text(
+                            'select'.tr(),
+                          ),
                         )
-                            : Text('unavailable'.tr(),
-                            style: const TextStyle(color: Colors.grey)))
+                            : Text(
+                          'unavailable'.tr(),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ))
                             : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment:
+                          MainAxisAlignment
+                              .center,
                           children: [
-                            Icon(driver.statusIcon,
-                                color: driver.statusColor),
-                            Text(driver.status,
-                                style: TextStyle(color: driver.statusColor)),
+                            Icon(
+                              driver.statusIcon,
+                              color:
+                              driver.statusColor,
+                            ),
+                            Text(
+                              driver.status,
+                              style: TextStyle(
+                                color: driver
+                                    .statusColor,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -640,11 +682,17 @@ class DriverSearchDelegate extends SearchDelegate<String?> {
   final List<Driver> allDrivers;
   final bool isSelectionMode;
 
-  DriverSearchDelegate(this.allDrivers, {required this.isSelectionMode});
+  DriverSearchDelegate(
+      this.allDrivers, {
+        required this.isSelectionMode,
+      });
 
   @override
   List<Widget> buildActions(BuildContext context) => [
-    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+    IconButton(
+      icon: const Icon(Icons.clear),
+      onPressed: () => query = '',
+    ),
   ];
 
   @override
@@ -658,13 +706,11 @@ class DriverSearchDelegate extends SearchDelegate<String?> {
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    // [FIXED] The search logic is updated here.
+    final queryLower = query.toLowerCase();
     final results = allDrivers.where((driver) {
-      final queryLower = query.toLowerCase();
-      final nameMatches = driver.name.toLowerCase().contains(queryLower);
+      final nameMatches =
+      driver.name.toLowerCase().contains(queryLower);
       final contactMatches = driver.contact.contains(queryLower);
-
-      // A driver is included in the results if the name OR the contact matches.
       return nameMatches || contactMatches;
     }).toList();
 

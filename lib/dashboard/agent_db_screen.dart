@@ -7,7 +7,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../dashboard/widgets/feature_card.dart';
 import '../widgets/common/app_bar.dart';
 import '../services/onesignal_notification_service.dart';
-import '../features/auth/services/supabase_service.dart';
 import '../features/Report Analysis/report_chart.dart';
 import '../features/bilty/shipment_selection_page.dart';
 import '../features/tracking/shared_shipments_page.dart';
@@ -121,7 +120,7 @@ class _AgentDashboardState extends State<AgentDashboard> {
           isLoading: false,
           userProfile: profile,
           shipmentStats: results[0] as Map<String, int>,
-          activeShipment: results[1] as Map<String, dynamic>?,
+          activeShipment: results[1],
         );
       });
     } catch (e) {
@@ -184,7 +183,7 @@ class _AgentDashboardState extends State<AgentDashboard> {
     decoration: BoxDecoration(
       gradient: LinearGradient(colors: [Colors.green.shade700, Colors.green.shade500]),
       borderRadius: BorderRadius.circular(16),
-      boxShadow: [BoxShadow(color: Colors.green.withOpacity(.3), blurRadius: 8)],
+      boxShadow: [BoxShadow(color: Colors.green.withValues(alpha: .3), blurRadius: 8)],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,

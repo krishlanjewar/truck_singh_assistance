@@ -647,7 +647,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
             ),
             const Divider(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedRecipientRole,
+              initialValue: _selectedRecipientRole,
               decoration: InputDecoration(
                 labelText: 'select_recipient_role'.tr(),
                 border: const OutlineInputBorder(),
@@ -762,7 +762,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
             ),
             const Divider(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedSubject,
+              initialValue: _selectedSubject,
               decoration: InputDecoration(
                 labelText: 'subject_label'.tr(),
                 border: const OutlineInputBorder(),

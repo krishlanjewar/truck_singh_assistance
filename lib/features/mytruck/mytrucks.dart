@@ -252,9 +252,8 @@ class _MytrucksState extends State<Mytrucks> {
     final total = allTrucks.length;
     final available = allTrucks.where((t) => t['status'] == 'available').length;
     final onTrip = allTrucks.where((t) => t['status'] == 'on_trip').length;
-    final maintenance = allTrucks
-        .where((t) => t['status'] == 'maintenance')
-        .length;
+    final maintenance =
+        allTrucks.where((t) => t['status'] == 'maintenance').length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -381,7 +380,7 @@ class _MytrucksState extends State<Mytrucks> {
           onPressed: () => Navigator.pop(context, truck),
           child: const Text('Select'),
         )
-            : Text(
+            : const Text(
           'Unavailable',
           style: TextStyle(color: Colors.grey, fontSize: 12),
         ))
@@ -392,7 +391,9 @@ class _MytrucksState extends State<Mytrucks> {
             : null)
             : () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => EditTruckPage(truck: truck)),
+          MaterialPageRoute(
+            builder: (_) => EditTruckPage(truck: truck),
+          ),
         ).then((_) => _loadTrucks()),
       ),
     );
@@ -400,13 +401,12 @@ class _MytrucksState extends State<Mytrucks> {
 
   Widget _buildAddTruckButton() {
     return FloatingActionButton(
-      onPressed: () =>
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddTruckPage()),
-          ).then((value) {
-            if (value == true) _loadTrucks();
-          }),
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AddTruckPage()),
+      ).then((value) {
+        if (value == true) _loadTrucks();
+      }),
       child: const Icon(Icons.add),
     );
   }
@@ -440,14 +440,17 @@ class _MytrucksState extends State<Mytrucks> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.local_shipping, size: 48, color: Colors.grey),
-          SizedBox(height: 16),
+          const Icon(Icons.local_shipping, size: 48, color: Colors.grey),
+          const SizedBox(height: 16),
           Text(
             'no_trucks_found'.tr(),
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
           ),
-          SizedBox(height: 8),
-          Text('tap_to_add_truck'.tr(), style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 8),
+          Text(
+            'tap_to_add_truck'.tr(),
+            style: const TextStyle(color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -507,9 +510,9 @@ class _AddTruckPageState extends State<AddTruckPage> {
         if (mounted) Navigator.pop(context, true);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error adding truck: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error adding truck: $e')),
+          );
         }
       }
       if (mounted) setState(() => _isSubmitting = false);
@@ -520,8 +523,8 @@ class _AddTruckPageState extends State<AddTruckPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('add_new_truck'.tr())),
-      bottomNavigationBar:  _buildSubmitButton(),
-      body:  SafeArea(child: _buildForm()),
+      bottomNavigationBar: _buildSubmitButton(),
+      body: SafeArea(child: _buildForm()),
     );
   }
 
@@ -680,7 +683,8 @@ class _EditTruckPageState extends State<EditTruckPage> {
     super.initState();
     _controllers['truck_number']!.text = widget.truck['truck_number'] ?? '';
     _controllers['engine_number']!.text = widget.truck['engine_number'] ?? '';
-    _controllers['chassis_number']!.text = widget.truck['chassis_number'] ?? '';
+    _controllers['chassis_number']!.text =
+        widget.truck['chassis_number'] ?? '';
     _controllers['vehicle_type']!.text = widget.truck['vehicle_type'] ?? '';
     _controllers['make']!.text = widget.truck['make'] ?? '';
     _controllers['model']!.text = widget.truck['model'] ?? '';
@@ -720,9 +724,9 @@ class _EditTruckPageState extends State<EditTruckPage> {
         if (mounted) Navigator.pop(context, true);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error updating truck: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating truck: $e')),
+          );
         }
       }
       if (mounted) setState(() => _isSubmitting = false);
@@ -730,25 +734,27 @@ class _EditTruckPageState extends State<EditTruckPage> {
   }
 
   Future<void> _deleteTruck() async {
-    final confirm =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('confirm_deletion'.tr()),
-            content: Text('delete_truck_confirmation'.tr()),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text('cancel'.tr()),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text('delete'.tr(), style: TextStyle(color: Colors.red)),
-              ),
-            ],
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('confirm_deletion'.tr()),
+        content: Text('delete_truck_confirmation'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr()),
           ),
-        ) ??
-            false;
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'delete'.tr(),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    ) ??
+        false;
 
     if (!confirm) return;
 
@@ -758,9 +764,9 @@ class _EditTruckPageState extends State<EditTruckPage> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error deleting truck: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting truck: $e')),
+        );
       }
     }
     if (mounted) setState(() => _isSubmitting = false);

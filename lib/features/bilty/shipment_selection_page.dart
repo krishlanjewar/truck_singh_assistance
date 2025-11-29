@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:logistics_toolkit/config/theme.dart';
 import 'package:logistics_toolkit/features/bilty/bilty_pdf_preview_screen.dart';
 import 'package:logistics_toolkit/features/bilty/transport_bilty_form.dart';
 import 'package:path_provider/path_provider.dart';
@@ -77,7 +76,7 @@ class _ShipmentSelectionPageState extends State<ShipmentSelectionPage> {
         .from('bilties')
         .getPublicUrl(bilty['file_path']);
 
-    final file = File(
+    final _ = File(
       '${(await getApplicationDocumentsDirectory()).path}/$id.pdf',
     )..writeAsBytesSync((await http.get(Uri.parse(url))).bodyBytes);
 
@@ -92,7 +91,7 @@ class _ShipmentSelectionPageState extends State<ShipmentSelectionPage> {
     );
     if (!await file.exists()) return _toast('pleaseDownloadBeforeSharing'.tr());
 
-    await Share.shareXFiles([XFile(file.path)], text: "Bilty: #$id");
+    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: "Bilty: #$id"));
   }
 
   Future<void> _delete(String id) async {

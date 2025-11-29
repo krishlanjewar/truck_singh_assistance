@@ -22,155 +22,111 @@ class _TruckDocsScreenState extends State<TruckDocsScreen>
     with TickerProviderStateMixin {
   final supabase = Supabase.instance.client;
   final uuid = const Uuid();
-  final RefreshController _refreshController =
-  RefreshController(initialRefresh: false);
+  final RefreshController refresh = RefreshController(initialRefresh: false);
 
-  List<Map<String, dynamic>> truckData = [];
-  bool isLoading = true;
+  List<Map<String, dynamic>> trucks = [];
   Map<int, Map<String, Map<String, dynamic>>> truckDocs = {};
-  String? _uploadingTruckId;
-  String? _uploadingDocType;
-  Map<int, bool> _expandedTrucks = {};
-  String? _loggedInUserName;
+  Map<int, bool> expanded = {};
+  String? uploadingTruck, uploadingType, loggedName;
+  bool loading = true, searching = false, showPending = false;
+  String search = '';
+  final searchCtrl = TextEditingController();
+  late AnimationController anim;
 
-  late AnimationController _animationController;
-
-  final Map<String, Map<String, dynamic>> _documentTypes = {
+  final Map<String, Map<String, dynamic>> docTypes = {
     'Permit': {
       'icon': Icons.assignment,
-      'description': 'Valid truck permit',
+      'desc': 'Valid permit',
       'color': Colors.blue,
     },
     'Insurance': {
       'icon': Icons.shield,
-      'description': 'Active truck insurance',
+      'desc': 'Active insurance',
       'color': Colors.orange,
     },
     'Other': {
       'icon': Icons.insert_drive_file,
-      'description': 'Additional document',
+      'desc': 'Other document',
       'color': Colors.green,
     },
   };
-  bool isSearching = false;
-  String searchQuery = '';
-  bool showOnlyPending = false;
-  final TextEditingController _searchController = TextEditingController();
-  Future getOrCreateTempUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    var tempUserId = prefs.getString('temp_user_id');
-    if (tempUserId == null) {
-      tempUserId = uuid.v4();
-      await prefs.setString('temp_user_id', tempUserId);
-    }
-    return tempUserId;
-  }
-
-  Future getCustomUserId() async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId != null) {
-      try {
-        final profileRes = await supabase
-            .from('user_profiles')
-            .select('custom_user_id')
-            .eq('user_id', userId)
-            .single();
-        return profileRes['custom_user_id'] ?? 'TEMP_$userId';
-      } catch (e) {
-        return 'TEMP_$userId';
-      }
-    }
-    return await getOrCreateTempUserId();
-  }
 
   @override
   void initState() {
     super.initState();
-    _animationController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-    _searchController.addListener(() {
-      setState(() {
-        searchQuery = _searchController.text.toLowerCase();
-      });
-    });
-    _fetchTrucks();
+    anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    searchCtrl.addListener(
+          () => setState(() => search = searchCtrl.text.toLowerCase()),
+    );
+    fetchTrucks();
   }
-  Future<List<String>> _getDriversForTruck(String truckNumber) async {
-    try {
-      final response = await supabase
-          .from('shipment')
-          .select('assigned_driver')
-          .eq('assigned_truck', truckNumber)
-          .not('booking_status', 'in', '("Completed", "cancelled")');
 
-      if (response.isEmpty) {
-        return [];
-      }
-      final driverIds = <String>{};
-      for (var row in response) {
-        if (row['assigned_driver'] != null) {
-          driverIds.add(row['assigned_driver'] as String);
-        }
-      }
-      return driverIds.toList();
-    } catch (e) {
-      print('Error finding drivers for truck $truckNumber: $e');
-      return [];
+  Future<String> getTempUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    var id = prefs.getString('temp_user_id');
+    if (id == null) {
+      id = uuid.v4();
+      await prefs.setString('temp_user_id', id);
+    }
+    return id;
+  }
+
+  Future<String> getCustomUser() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return await getTempUser();
+    try {
+      final res = await supabase
+          .from('user_profiles')
+          .select('custom_user_id')
+          .eq('user_id', userId)
+          .single();
+      return res['custom_user_id'] ?? 'TEMP_$userId';
+    } catch (_) {
+      return 'TEMP_$userId';
     }
   }
 
-  Future _fetchTrucks() async {
-    setState(() => isLoading = true);
+  Future fetchTrucks() async {
+    setState(() => loading = true);
     try {
-      final userId = await getCustomUserId();
-      final profileResponse = await supabase
+      final uid = await getCustomUser();
+      final profile = await supabase
           .from('user_profiles')
           .select('name')
-          .eq('custom_user_id', userId)
+          .eq('custom_user_id', uid)
           .maybeSingle();
-      if(profileResponse != null) {
-        _loggedInUserName = profileResponse['name'];
-      }
-      final response =
-      await supabase.from('trucks').select().eq('truck_admin', userId);
-      final fetchedTrucks = List<Map<String, dynamic>>.from(response);
-      setState(() {
-        truckData = fetchedTrucks;
-        _expandedTrucks = {for (var truck in truckData) truck['id']: true}; // Initialize all trucks as expanded
-      });
+      loggedName = profile?['name'];
 
-      if (truckData.isNotEmpty) {
-        await Future.wait(
-          truckData.map((truck) => _fetchDocs(truck['id'] as int)),
-        );
-      }
-      _animationController.forward();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching trucks: $e')),
-      );
+      final res = await supabase.from('trucks').select().eq('truck_admin', uid);
+      trucks = List<Map<String, dynamic>>.from(res);
+      expanded = {for (var t in trucks) t['id']: true};
+
+      await Future.wait(trucks.map((t) => fetchDocs(t['id'])));
+      anim.forward();
     } finally {
-      setState(() => isLoading = false);
-      _refreshController.refreshCompleted();
+      loading = false;
+      refresh.refreshCompleted();
+      setState(() {});
     }
   }
 
-  Future _fetchDocs(int truckId) async {
+  Future fetchDocs(int id) async {
     try {
       final res = await supabase
           .from('truck_documents')
           .select()
-          .eq('truck_id', truckId);
-      final docList = List<Map<String, dynamic>>.from(res);
-      final docStatus = <String, Map<String, dynamic>>{};
-
-      for (var type in _documentTypes.keys) {
-        final doc = docList.firstWhere(
+          .eq('truck_id', id);
+      final list = List<Map<String, dynamic>>.from(res);
+      final map = <String, Map<String, dynamic>>{};
+      for (var type in docTypes.keys) {
+        final doc = list.firstWhere(
               (d) => d['doc_type'] == type,
           orElse: () => {},
         );
-        docStatus[type] = {
+        map[type] = {
           'uploaded': doc.isNotEmpty,
           'uploadedAt': doc['uploaded_at'],
           'filePath': doc['file_path'],
@@ -178,234 +134,166 @@ class _TruckDocsScreenState extends State<TruckDocsScreen>
           'docId': doc['id'],
         };
       }
-      setState(() {
-        truckDocs[truckId] = docStatus;
-      });
-    } catch (e) {
-      debugPrint('Could not fetch docs for truck $truckId: $e');
+      truckDocs[id] = map;
+    } catch (_) {}
+  }
+
+  Future<List<String>> getTruckDrivers(String truckNo) async {
+    try {
+      final res = await supabase
+          .from('shipment')
+          .select('assigned_driver')
+          .eq('assigned_truck', truckNo)
+          .not('booking_status', 'in', '("Completed","cancelled")');
+      return res
+          .where((r) => r['assigned_driver'] != null)
+          .map<String>((e) => e['assigned_driver'])
+          .toSet()
+          .toList();
+    } catch (_) {
+      return [];
     }
   }
 
-  // Show camera tips dialog
-  Future<void> _showCameraTipsDialog() async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Warning'),
-          content: const SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: [
-                    Icon(Icons.lightbulb, color: Colors.yellow),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Ensure the image is taken in proper lighting to capture clear details.')),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.pan_tool, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Hold the camera steady to avoid blurry images.')),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.flash_on, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Use flash when necessary, especially in low-light conditions.')),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.crop, color: Colors.green),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Position the document flat and fill the frame for best readability.')),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.visibility_off, color: Colors.red),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Avoid shadows or glare on the document.')),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Okay'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future _pickAndUploadFile(int truckId, String docType) async {
-    String? userId = supabase.auth.currentUser?.id; // This must be a UUID or null
-    String? customUserId;
+  Future pickUpload(int id, String type) async {
+    String? userId = supabase.auth.currentUser?.id;
+    String? custom;
 
     if (userId == null) {
-      // User not logged in, generate temp user id (non UUID)
-      customUserId = await getOrCreateTempUserId();
+      custom = await getTempUser();
     } else {
-      // Try to get proper UUID user_id from user_profiles
       try {
-        final profileRes = await supabase
-            .from('user_profiles').select('user_id')
+        final profile = await supabase
+            .from('user_profiles')
+            .select('user_id')
             .eq('user_id', userId)
             .single();
-        userId = profileRes['user_id'] as String;
-      } catch (e) {
-        // On failure fallback store original userId as customUserId
-        customUserId = userId;
+        userId = profile['user_id'];
+      } catch (_) {
+        custom = userId;
         userId = null;
       }
     }
 
-    // Prompt user to choose source: Camera or Gallery (centered dialog)
-    final FilePickerSource? source = await showDialog<FilePickerSource>(
+    final src = await showDialog<FilePickerSource>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Choose Source'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
-                onTap: () => Navigator.pop(context, FilePickerSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
-                onTap: () => Navigator.pop(context, FilePickerSource.gallery),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => AlertDialog(
+        title: const Text('Select Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, FilePickerSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, FilePickerSource.gallery),
+            ),
+          ],
+        ),
+      ),
     );
 
-    if (source == null) return; // User cancelled selection
-
+    if (src == null) return;
     File? file;
-    String? fileName;
+    String name;
 
-    if (source == FilePickerSource.camera) {
-      // Show camera tips before opening the camera
-      await _showCameraTipsDialog();
-
+    if (src == FilePickerSource.camera) {
       final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(source: ImageSource.camera);
-      if (pickedFile == null) return;
-
-      file = File(pickedFile.path);
-      fileName = '${DateTime.now().millisecondsSinceEpoch}_${pickedFile.name}';
+      final img = await picker.pickImage(source: ImageSource.camera);
+      if (img == null) return;
+      file = File(img.path);
+      name = '${DateTime.now().millisecondsSinceEpoch}_${img.name}';
     } else {
-      // Use FilePicker for gallery
-      final result = await FilePicker.platform.pickFiles(allowMultiple: false);
-      if (result == null || result.files.isEmpty) return;
-
+      final result = await FilePicker.platform.pickFiles();
+      if (result == null) return;
       file = File(result.files.single.path!);
-      fileName = '${DateTime.now().millisecondsSinceEpoch}_${result.files.single.name}';
+      name =
+      '${DateTime.now().millisecondsSinceEpoch}_${result.files.single.name}';
     }
 
-    final filePath = '${userId ?? customUserId}/$truckId/$fileName';
-
-    setState(() {
-      _uploadingTruckId = truckId.toString();
-      _uploadingDocType = docType;
-    });
+    final path = '${userId ?? custom}/$id/$name';
+    setState(() => {uploadingTruck = "$id", uploadingType = type});
 
     try {
-      await supabase.storage.from('truck-docs').upload(filePath, file);
+      await supabase.storage.from('truck-docs').upload(path, file);
       await supabase.from('truck_documents').upsert({
-        'truck_id': truckId,
-        'user_id': userId,             // UUID or null here
-        'custom_user_id': customUserId, // Put fallback string here
-        'doc_type': docType,
-        'file_name': fileName,
-        'file_path': filePath,
+        'truck_id': id,
+        'user_id': userId,
+        'custom_user_id': custom,
+        'doc_type': type,
+        'file_name': name,
+        'file_path': path,
         'uploaded_at': DateTime.now().toIso8601String(),
       }, onConflict: 'truck_id,doc_type');
 
-      // --- START NOTIFICATION LOGIC ---
-      if (customUserId != null) {
-        final uploaderName = _loggedInUserName ?? customUserId;
-        final truck = truckData.firstWhere((t) => t['id'] == truckId);
-        final truckNumber = truck['truck_number'] ?? 'your truck';
-
-        // 1. Notify self (Agent or Truck Owner)
+      if (custom != null) {
+        final truck = trucks.firstWhere((t) => t['id'] == id);
+        final drivers = await getTruckDrivers(truck['truck_number']);
         NotificationService.sendPushNotificationToUser(
-          recipientId: customUserId,
+          recipientId: custom,
           title: 'Document Uploaded'.tr(),
-          message: 'You have successfully uploaded $docType for truck $truckNumber.'.tr(),
-          data: {'type': 'truck_document_upload', 'truck_number': truckNumber},
+          message: 'Uploaded $type for ${truck['truck_number']}'.tr(),
+          data: {'type': 'doc', 'truck': truck['truck_number']},
         );
-
-        // 2. Find and notify assigned drivers
-        final driverIds = await _getDriversForTruck(truckNumber);
-        for (final driverId in driverIds) {
+        for (final d in drivers) {
           NotificationService.sendPushNotificationToUser(
-            recipientId: driverId,
+            recipientId: d,
             title: 'Truck Document Updated'.tr(),
-            message: '$uploaderName has uploaded a new document ($docType) for your assigned truck $truckNumber.'.tr(),
-            data: {'type': 'truck_document_update', 'truck_number': truckNumber},
+            message: '$loggedName uploaded $type for ${truck['truck_number']}'
+                .tr(),
+            data: {'type': 'update', 'truck': truck['truck_number']},
           );
         }
       }
-      // --- END NOTIFICATION LOGIC ---
 
-      await _fetchDocs(truckId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('$docType uploaded successfully!'),
-        backgroundColor: Colors.green,
-      ));
+      await fetchDocs(id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$type uploaded'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error uploading $docType: $e'),
-        backgroundColor: Colors.red,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-      setState(() {
-        _uploadingTruckId = null;
-        _uploadingDocType = null;
-      });
+      setState(() => {uploadingTruck = null, uploadingType = null});
     }
   }
 
+  List<Map<String, dynamic>> filtered() {
+    return trucks.where((t) {
+      final id = t['id'];
+      final docs = truckDocs[id] ?? {};
+      final count = docs.values.where((d) => d['uploaded'] == true).length;
+      final matchesText =
+          search.isEmpty ||
+              t['truck_number'].toString().toLowerCase().contains(search);
+      final matchesPending = !showPending || count < docTypes.length;
+      return matchesText && matchesPending;
+    }).toList();
+  }
 
-  Widget _buildDocumentRow(int truckId, String docType, Map docInfo) {
-    final hasDoc = docInfo['uploaded'] ?? false;
-    final typeInfo = _documentTypes[docType]!;
-    final isUploading = _uploadingTruckId == truckId.toString() &&
-        _uploadingDocType == docType;
-
+  Widget buildDoc(int id, String type, Map info) {
+    final typeInfo = docTypes[type]!;
+    final uploaded = info['uploaded'] ?? false;
+    final uploading = uploadingTruck == "$id" && uploadingType == type;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
-      //color: Theme.of(context).cardColor,
       decoration: BoxDecoration(
-        //color: hasDoc ? Colors.green.shade50 : null ,
-        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: hasDoc ? Colors.green.shade200 : Colors.grey.shade300,
+          color: uploaded ? Colors.green : Colors.grey.shade400,
         ),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -415,248 +303,158 @@ class _TruckDocsScreenState extends State<TruckDocsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(docType,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14)),
-                Text(typeInfo['description'],
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                if (hasDoc && docInfo['uploadedAt'] != null)
+                Text(type, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(typeInfo['desc'], style: const TextStyle(fontSize: 12)),
+                if (uploaded && info['uploadedAt'] != null)
                   Text(
-                    'Uploaded: ${docInfo['uploadedAt']}',
-                    style: TextStyle(fontSize: 10, color: Colors.green.shade600),
+                    'Uploaded: ${info['uploadedAt']}',
+                    style: const TextStyle(fontSize: 10),
                   ),
               ],
             ),
           ),
-          if (isUploading)
-            const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            ElevatedButton(
-              onPressed: () => _pickAndUploadFile(truckId, docType),
-              child: Text(hasDoc ? 'Update' : 'Upload'),
-            ),
+          uploading
+              ? const CircularProgressIndicator(strokeWidth: 2)
+              : ElevatedButton(
+            onPressed: () => pickUpload(id, type),
+            child: Text(uploaded ? 'Update' : 'Upload'),
+          ),
         ],
       ),
     );
   }
 
-  void _onRefresh() => _fetchTrucks();
-
-  List<Map<String, dynamic>> _getFilteredTrucks() {
-    return truckData.where((truck) {
-      final truckId = truck['id'] as int;
-      final docsStatus = truckDocs[truckId] ?? {};
-      final uploadedCount = docsStatus.values.where((d) => d['uploaded'] == true).length;
-      final totalDocs = _documentTypes.length;
-
-      final matchesSearch = searchQuery.isEmpty ||
-          (truck['truck_number']?.toString().toLowerCase().contains(searchQuery) ?? false);
-
-      final matchesPendingFilter = !showOnlyPending || uploadedCount < totalDocs;
-
-      return matchesSearch && matchesPendingFilter;
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final filteredTrucks = _getFilteredTrucks();
+    final list = filtered();
 
     return Scaffold(
       appBar: AppBar(
-        title: isSearching
+        title: searching
             ? TextField(
-          controller: _searchController,
+          controller: searchCtrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Search by truck number...',
-            border: InputBorder.none,
-            //hintStyle: TextStyle(color: Colors.white70),
-          ),
-          //style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Search...'),
         )
             : const Text('Truck Documents'),
-        backgroundColor: Colors.blue.shade600,
-        //foregroundColor: Colors.white,
         actions: [
-          if (isSearching)
-            IconButton(
-              icon: const Icon(Icons.cancel),
-              onPressed: () {
-                setState(() {
-                  isSearching = false;
-                  _searchController.clear();
-                });
-              },
-            )
-          else ...[
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                setState(() {
-                  isSearching = true;
-                });
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.filter_list,
-                color: showOnlyPending ? Colors.blueAccent : null,
+          searching
+              ? IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() {
+              searching = false;
+              searchCtrl.clear();
+            }),
+          )
+              : Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.search),
+                onPressed: () => setState(() => searching = true),
               ),
-              onPressed: () {
-                setState(() {
-                  showOnlyPending = !showOnlyPending;
-                });
-              },
-            ),
-          ],
+              IconButton(
+                icon: Icon(
+                  Icons.filter_list,
+                  color: showPending ? Colors.blue : null,
+                ),
+                onPressed: () =>
+                    setState(() => showPending = !showPending),
+              ),
+            ],
+          ),
         ],
       ),
       body: SmartRefresher(
-        controller: _refreshController,
-        onRefresh: _onRefresh,
+        controller: refresh,
+        onRefresh: fetchTrucks,
         header: const WaterDropHeader(),
-        child: isLoading
+        child: loading
             ? const Center(child: CircularProgressIndicator())
-            : filteredTrucks.isEmpty
+            : list.isEmpty
             ? const Center(child: Text('No trucks found'))
             : ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: filteredTrucks.length,
-          itemBuilder: (context, index) {
-            final truck = filteredTrucks[index];
-            final truckId = truck['id'] as int;
-            final docsStatus = truckDocs[truckId] ?? {};
-            final totalDocs = _documentTypes.length;
-            final uploadedCount = docsStatus.values
+          itemCount: list.length,
+          itemBuilder: (_, i) {
+            final t = list[i];
+            final id = t['id'];
+            final docs = truckDocs[id] ?? {};
+            final uploadedCount = docs.values
                 .where((d) => d['uploaded'] == true)
                 .length;
-            final isExpanded = _expandedTrucks[truckId] ?? true;
+            final isOpen = expanded[id] ?? true;
 
             return AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return SlideTransition(
-                  position: Tween(
-                      begin: const Offset(1, 0), end: Offset.zero)
-                      .animate(CurvedAnimation(
-                    parent: _animationController,
-                    curve: Interval(index * 0.1, 1.0,
-                        curve: Curves.easeOutBack),
-                  )),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      // color: Colors.white,
-                      color: Theme.of(context).cardColor,
-
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.blue.shade100,
-                                child: const Icon(
-                                    Icons.local_shipping,
-                                    color: Colors.blue),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  truck['truck_number'] ??
-                                      'Unnamed Truck',
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  isExpanded
-                                      ? Icons.expand_less
-                                      : Icons.expand_more,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _expandedTrucks[truckId] =
-                                    !isExpanded;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: uploadedCount == totalDocs
-                                  ? Colors.green.shade50
-                                  : Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: uploadedCount == totalDocs
-                                    ? Colors.green.shade200
-                                    : Colors.orange.shade200,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  uploadedCount == totalDocs
-                                      ? Icons.check_circle
-                                      : Icons.pending,
-                                  color: uploadedCount == totalDocs
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade700,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '$uploadedCount / $totalDocs documents uploaded',
-                                  style: TextStyle(
-                                    color: uploadedCount == totalDocs
-                                        ? Colors.green.shade700
-                                        : Colors.orange.shade700,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (isExpanded) ...[
-                            const SizedBox(height: 16),
-                            ..._documentTypes.keys.map((docType) {
-                              final docInfo =
-                                  docsStatus[docType] ?? {'uploaded': false};
-                              return _buildDocumentRow(
-                                  truckId, docType, docInfo);
-                            }).toList(),
-                          ],
-                        ],
-                      ),
+              animation: anim,
+              builder: (_, child) => SlideTransition(
+                position:
+                Tween(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: anim,
+                    curve: Interval(
+                      i * .1,
+                      1,
+                      curve: Curves.easeOutBack,
                     ),
                   ),
-                );
-              },
+                ),
+                child: child!,
+              ),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.local_shipping),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              t['truck_number'],
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              isOpen
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                            ),
+                            onPressed: () =>
+                                setState(() => expanded[id] = !isOpen),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$uploadedCount / ${docTypes.length} uploaded',
+                        style: TextStyle(
+                          color: uploadedCount == docTypes.length
+                              ? Colors.green
+                              : Colors.orange,
+                        ),
+                      ),
+                      if (isOpen) const SizedBox(height: 12),
+                      if (isOpen)
+                        ...docTypes.keys.map(
+                              (type) => buildDoc(
+                            id,
+                            type,
+                            docs[type] ?? {'uploaded': false},
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             );
           },
         ),

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:logistics_toolkit/config/config.dart';
-import 'package:logistics_toolkit/features/shipment/shipment_preview_page.dart';
+import 'package:intl/intl.dart';
+import '../../config/config.dart';
+import '../shipment/shipment_preview_page.dart';
 import 'address_search_page.dart';
 import 'form_step/address_step.dart';
 import 'form_step/schedule_step.dart';
@@ -18,7 +20,7 @@ class ShipperFormPage extends StatefulWidget {
   const ShipperFormPage({Key? key}) : super(key: key);
 
   @override
-  _ShipperFormPageState createState() => _ShipperFormPageState();
+  State<ShipperFormPage> createState() => _ShipperFormPageState();
 }
 
 class _ShipperFormPageState extends State<ShipperFormPage>
@@ -28,29 +30,25 @@ class _ShipperFormPageState extends State<ShipperFormPage>
   final _itemController = TextEditingController();
   final _weightController = TextEditingController();
   final _unitController = TextEditingController();
-
   final _materialController = TextEditingController();
   final _notesController = TextEditingController();
 
-  late AnimationController _fadeController;
-  late AnimationController _slideController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late final AnimationController _fadeController;
+  late final AnimationController _slideController;
 
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
   Place? _pickupPlace;
   Place? _dropPlace;
-
   DateTime? _selectedDate;
-  String? _selectedTruckType;
   DateTime? _pickupDate;
   String? _pickupTime;
-
+  String? _selectedTruckType;
   String? _selectedShipperId;
   String? _selectedShipperName;
   bool _isLoadingShipper = true;
   bool _isSubmitting = false;
   bool _isPrivate = false;
-
   int _currentStep = 0;
   final PageController _pageController = PageController();
 
@@ -70,9 +68,9 @@ class _ShipperFormPageState extends State<ShipperFormPage>
   @override
   void initState() {
     super.initState();
+    _initAnimations();
     _fetchShippers();
     _loadDraft();
-    _initAnimations();
   }
 
   void _initAnimations() {
@@ -85,13 +83,15 @@ class _ShipperFormPageState extends State<ShipperFormPage>
       duration: const Duration(milliseconds: 800),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    _fadeAnimation =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut);
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
     );
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
-        );
 
     _fadeController.forward();
     _slideController.forward();
@@ -104,7 +104,6 @@ class _ShipperFormPageState extends State<ShipperFormPage>
     _unitController.dispose();
     _materialController.dispose();
     _notesController.dispose();
-
     _fadeController.dispose();
     _slideController.dispose();
     _pageController.dispose();
@@ -113,21 +112,25 @@ class _ShipperFormPageState extends State<ShipperFormPage>
 
   Future<void> _fetchShippers() async {
     try {
-      var user = Supabase.instance.client.auth.currentUser;
+      final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
-      final response = await Supabase.instance.client
+
+      final res = await Supabase.instance.client
           .from('user_profiles')
           .select('custom_user_id, name')
           .eq('user_id', user.id)
           .maybeSingle();
-      setState(() {
-        _selectedShipperId = response?['custom_user_id'];
-        _selectedShipperName = response?['name'];
-        _isLoadingShipper = false;
-      });
+
+      if (mounted) {
+        setState(() {
+          _selectedShipperId = res?['custom_user_id'];
+          _selectedShipperName = res?['name'];
+          _isLoadingShipper = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingShipper = false);
-      debugPrint('Error fetching shipper info: $e');
+      debugPrint("❌ Error fetching shipper data: $e");
+      if (mounted) setState(() => _isLoadingShipper = false);
     }
   }
 
@@ -137,18 +140,22 @@ class _ShipperFormPageState extends State<ShipperFormPage>
     setState(() {
       final pickupDesc = prefs.getString('pickup') ?? '';
       final dropDesc = prefs.getString('drop') ?? '';
-      if (pickupDesc.isNotEmpty)
+
+      if (pickupDesc.isNotEmpty) {
         _pickupPlace = Place(
           description: pickupDesc,
           lat: prefs.getDouble('pickup_latitude') ?? 0,
           lng: prefs.getDouble('pickup_longitude') ?? 0,
         );
-      if (dropDesc.isNotEmpty)
+      }
+
+      if (dropDesc.isNotEmpty) {
         _dropPlace = Place(
           description: dropDesc,
           lat: prefs.getDouble('dropoff_latitude') ?? 0,
           lng: prefs.getDouble('dropoff_longitude') ?? 0,
         );
+      }
 
       _itemController.text = prefs.getString('item') ?? '';
       _weightController.text = prefs.getString('weight') ?? '';
@@ -156,12 +163,16 @@ class _ShipperFormPageState extends State<ShipperFormPage>
       _materialController.text = prefs.getString('material') ?? '';
       _notesController.text = prefs.getString('notes') ?? '';
 
-      _pickupTime = prefs.getString('pickupTime');
-      String? dateString = prefs.getString('deliveryDate');
+      final pickupTime = prefs.getString('pickupTime');
+      if (pickupTime != null) _pickupTime = pickupTime;
+
+      final dateString = prefs.getString('deliveryDate');
       if (dateString != null) _selectedDate = DateTime.tryParse(dateString);
 
-      final pickupDateStr = prefs.getString('pickupDate');
-      if (pickupDateStr != null) _pickupDate = DateTime.tryParse(pickupDateStr);
+      final pickupDtString = prefs.getString('pickupDate');
+      if (pickupDtString != null) {
+        _pickupDate = DateTime.tryParse(pickupDtString);
+      }
 
       _selectedTruckType = prefs.getString('truckType');
     });
@@ -180,13 +191,21 @@ class _ShipperFormPageState extends State<ShipperFormPage>
     await prefs.setString('material', _materialController.text);
     await prefs.setString('notes', _notesController.text);
 
-    if (_selectedDate != null)
+    if (_selectedDate != null) {
       await prefs.setString('deliveryDate', _selectedDate!.toIso8601String());
-    if (_pickupDate != null)
+    }
+
+    if (_pickupDate != null) {
       await prefs.setString('pickupDate', _pickupDate!.toIso8601String());
-    if (_selectedTruckType != null)
+    }
+
+    if (_pickupTime != null) {
+      await prefs.setString('pickupTime', _pickupTime!);
+    }
+
+    if (_selectedTruckType != null) {
       await prefs.setString('truckType', _selectedTruckType!);
-    if (_pickupTime != null) await prefs.setString('pickupTime', _pickupTime!);
+    }
 
     if (_pickupPlace != null) {
       await prefs.setDouble('pickup_latitude', _pickupPlace!.lat);
@@ -205,35 +224,32 @@ class _ShipperFormPageState extends State<ShipperFormPage>
         valid = _selectedTruckType != null;
         break;
       case 1:
-        valid =
-            _itemController.text.isNotEmpty &&
-                _weightController.text.isNotEmpty || _unitController.text.isNotEmpty;
+        valid = _itemController.text.isNotEmpty &&
+            (_weightController.text.isNotEmpty ||
+                _unitController.text.isNotEmpty);
         break;
       case 2:
         valid = _pickupPlace != null && _dropPlace != null;
         break;
       case 3:
-        valid =
-            _selectedDate != null &&
-                _pickupDate != null &&
-                _pickupTime != null &&
-                _materialController.text.isNotEmpty;
+        valid = _selectedDate != null &&
+            _pickupDate != null &&
+            _pickupTime != null &&
+            _materialController.text.isNotEmpty;
         break;
     }
     setState(() {
       _stepValid[_currentStep] = valid;
-      _isFormValid = _stepValid.every((e) => e);
+      _isFormValid = _stepValid.every((x) => x);
     });
     _saveDraft();
   }
 
   void _nextStep() {
     if (_currentStep < 3) {
-      setState(() {
-        _currentStep++;
-      });
+      setState(() => _currentStep++);
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
       );
       _resetAnimations();
@@ -243,11 +259,9 @@ class _ShipperFormPageState extends State<ShipperFormPage>
 
   void _previousStep() {
     if (_currentStep > 0) {
-      setState(() {
-        _currentStep--;
-      });
+      setState(() => _currentStep--);
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
       );
       _resetAnimations();
@@ -265,7 +279,7 @@ class _ShipperFormPageState extends State<ShipperFormPage>
   Future<void> _submitShipment() async {
     if (!_isFormValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please complete all required fields")),
+        const SnackBar(content: Text('Please complete all fields')),
       );
       return;
     }
@@ -273,35 +287,39 @@ class _ShipperFormPageState extends State<ShipperFormPage>
     setState(() => _isSubmitting = true);
 
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final profile = await Supabase.instance.client
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser!.id;
+
+      final profile = await supabase
           .from('user_profiles')
           .select('custom_user_id')
           .eq('user_id', userId)
           .maybeSingle();
+
       final shipperId = profile?['custom_user_id'];
 
       final today = DateFormat('yyyyMMdd').format(DateTime.now());
-      final prefix = 'SHP-$today';
+      final prefix = "SHP-$today";
 
-      final response = await Supabase.instance.client
+      final response = await supabase
           .from('shipment')
           .select('shipment_id')
           .like('shipment_id', '$prefix%')
           .order('shipment_id', ascending: false)
           .limit(1);
 
-      int newNum = 1;
+      int newNumber = 1;
       if (response.isNotEmpty) {
         final lastId = response.first['shipment_id'] as String;
-        final lastNumPart = lastId.split('-').last;
-        newNum = (int.tryParse(lastNumPart) ?? 0) + 1;
+        final number = int.tryParse(lastId.split('-').last);
+        newNumber = (number ?? 0) + 1;
       }
 
-      final shipmentId = '$prefix-${newNum.toString().padLeft(4, '0')}';
+      final newShipmentId =
+          "$prefix-${newNumber.toString().padLeft(4, '0')}";
 
-      await Supabase.instance.client.from('shipment').insert({
-        'shipment_id': shipmentId,
+      await supabase.from('shipment').insert({
+        'shipment_id': newShipmentId,
         'shipper_id': _selectedShipperId,
         'pickup': _pickupPlace!.description,
         'drop': _dropPlace!.description,
@@ -314,34 +332,34 @@ class _ShipperFormPageState extends State<ShipperFormPage>
         'unit': _unitController.text,
         'delivery_date': _selectedDate!.toIso8601String(),
         'pickup_date': _pickupDate!.toIso8601String(),
+        'pickup_time': _pickupTime,
         'material_inside': _materialController.text,
         'truck_type': _selectedTruckType,
-        'pickup_time': _pickupTime,
         'notes': _notesController.text,
         'booking_status': _isPrivate ? 'Accepted' : 'Pending',
         'assigned_company': _isPrivate ? shipperId : null,
       });
 
-      await _insertShipmentUpdate(shipmentId);
+      await _insertShipmentUpdate(newShipmentId);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Submitted successfully!'),
+          content: Text("Shipment created successfully!"),
           backgroundColor: Colors.green,
         ),
       );
-      _clearForm();
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ShipmentPreviewPage(shipmentId: shipmentId),
+          builder: (_) => ShipmentPreviewPage(shipmentId: newShipmentId),
         ),
       );
+      _clearForm();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed: $e")),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -363,7 +381,7 @@ class _ShipperFormPageState extends State<ShipperFormPage>
         'updated_by_user_id': profile?['custom_user_id'],
       });
     } catch (e) {
-      debugPrint('Error inserting shipment update: $e');
+      debugPrint("❌ error inserting updates: $e");
     }
   }
 
@@ -371,8 +389,8 @@ class _ShipperFormPageState extends State<ShipperFormPage>
     _formKey.currentState?.reset();
     _itemController.clear();
     _weightController.clear();
-    _materialController.clear();
     _unitController.clear();
+    _materialController.clear();
     _notesController.clear();
 
     setState(() {
@@ -399,12 +417,14 @@ class _ShipperFormPageState extends State<ShipperFormPage>
       context,
       MaterialPageRoute(builder: (_) => const AddressSearchPage()),
     );
+
     if (result is Place) {
       setState(() {
-        if (isPickup)
+        if (isPickup) {
           _pickupPlace = result;
-        else
+        } else {
           _dropPlace = result;
+        }
       });
       _validateForm();
     }
@@ -417,10 +437,11 @@ class _ShipperFormPageState extends State<ShipperFormPage>
     );
     if (result is Place) {
       setState(() {
-        if (isPickup)
+        if (isPickup) {
           _pickupPlace = result;
-        else
+        } else {
           _dropPlace = result;
+        }
       });
       _validateForm();
     }
@@ -444,7 +465,7 @@ class _ShipperFormPageState extends State<ShipperFormPage>
   Future<void> _pickPickupDate() async {
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a delivery date first.')),
+        const SnackBar(content: Text("Please select delivery date first")),
       );
       return;
     }
@@ -461,14 +482,11 @@ class _ShipperFormPageState extends State<ShipperFormPage>
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
+    final picked =
+    await showTimePicker(context: context, initialTime: TimeOfDay.now());
+
     if (picked != null) {
-      setState(() {
-        _pickupTime = picked.format(context);
-      });
+      setState(() => _pickupTime = picked.format(context));
       _validateForm();
     }
   }
@@ -482,16 +500,13 @@ class _ShipperFormPageState extends State<ShipperFormPage>
           padding: const EdgeInsets.all(20),
           margin: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            //color: Colors.white,
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
-                //color: Colors.grey.withOpacity(0.1),
-                color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-                spreadRadius: 2,
+                color: Theme.of(context).shadowColor.withOpacity(0.1),
                 blurRadius: 10,
-                offset: const Offset(0, 3),
+                spreadRadius: 2,
               ),
             ],
           ),
@@ -502,23 +517,16 @@ class _ShipperFormPageState extends State<ShipperFormPage>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Step ${_currentStep + 1} of 4',
+                    "Step ${_currentStep + 1} of 4",
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      //color: Colors.black87,
-                    ),
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   TextButton.icon(
                     onPressed: _saveDraft,
                     icon: const Icon(Icons.save, size: 18),
-                    label: const Text('Save Draft'),
+                    label: const Text("Save Draft"),
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.orange,
-                      //backgroundColor: Colors.orange.shade50,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
                     ),
                   ),
                 ],
@@ -544,7 +552,7 @@ class _ShipperFormPageState extends State<ShipperFormPage>
               const SizedBox(height: 8),
               Text(
                 _stepDescription(),
-                style: const TextStyle(/*color: Colors.grey,*/ fontSize: 14),
+                style: const TextStyle(fontSize: 14),
               ),
             ],
           ),
@@ -556,35 +564,28 @@ class _ShipperFormPageState extends State<ShipperFormPage>
   String _stepDescription() {
     switch (_currentStep) {
       case 0:
-        return 'Choose your preferred truck type';
+        return "Choose your preferred truck type";
       case 1:
-        return 'Enter shipment details';
+        return "Enter shipment details";
       case 2:
-        return 'Set pickup and delivery locations';
+        return "Set pickup & delivery locations";
       case 3:
-        return 'Schedule and preferences';
+        return "Schedule your shipment";
       default:
-        return '';
+        return "";
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      //backgroundColor: Colors.grey.shade50,
-      // appBar: CustomAppBar(
-      //   pageTitle: 'Create Shipment',
-      //   showProfile: false,
-      //   showNotifications: false,
-      // ),
-      appBar: AppBar(title: Text('createShipment'.tr())),
+      appBar: AppBar(title: Text("createShipment".tr())),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
             key: _formKey,
-            onChanged: _validateForm,
+            onChanged: () => _validateForm(),
             child: Column(
               children: [
                 Expanded(
@@ -595,10 +596,8 @@ class _ShipperFormPageState extends State<ShipperFormPage>
                       TruckTypeStep(
                         truckTypes: _truckTypes,
                         selectedTruckType: _selectedTruckType,
-                        onTruckTypeSelected: (val) {
-                          setState(() {
-                            _selectedTruckType = val;
-                          });
+                        onTruckTypeSelected: (v) {
+                          setState(() => _selectedTruckType = v);
                           _validateForm();
                         },
                         progressBar: _buildProgressBar(),
@@ -623,27 +622,27 @@ class _ShipperFormPageState extends State<ShipperFormPage>
                       ),
                       ScheduleStep(
                         selectedDate: _selectedDate,
-                        pickupTime: _pickupTime,
                         pickupDate: _pickupDate,
+                        pickupTime: _pickupTime,
                         materialController: _materialController,
                         notesController: _notesController,
                         isPrivate: _isPrivate,
+                        onPrivateChanged: (v) {
+                          setState(() => _isPrivate = v ?? false);
+                        },
+                        onChanged: _validateForm,
                         onDatePick: _pickDate,
                         onPickupDatePick: _pickPickupDate,
                         onTimePick: _pickTime,
-                        onPrivateChanged: (v) {
-                          setState(() {
-                            _isPrivate = v ?? false;
-                          });
-                        },
-                        onChanged: _validateForm,
                         progressBar: _buildProgressBar(),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+
+                // Bottom buttons
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, bottom: 16),
                   child: Row(
                     children: [
                       if (_currentStep > 0)
@@ -654,12 +653,12 @@ class _ShipperFormPageState extends State<ShipperFormPage>
                               FocusScope.of(context).unfocus();
                               _previousStep();
                             },
-                            icon: const Icon(Icons.arrow_back, size: 18),
-                            label: const Text('Back'),
+                            icon: const Icon(Icons.arrow_back),
+                            label: const Text("Back"),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.grey.shade600,
-                              //foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -681,26 +680,25 @@ class _ShipperFormPageState extends State<ShipperFormPage>
                               : null,
                           icon: _isSubmitting
                               ? const SizedBox(
-                            width: 18,
                             height: 18,
+                            width: 18,
                             child: CircularProgressIndicator(
-                              //color: Colors.white,
                               strokeWidth: 2,
                             ),
                           )
-                              : const Icon(Icons.send, size: 18),
+                              : const Icon(Icons.send),
                           label: Text(
-                            _isSubmitting ? 'Submitting...' : 'Submit',
+                            _isSubmitting
+                                ? "Submitting..."
+                                : "Submit",
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                            _isFormValid && !_isSubmitting
+                            backgroundColor: _isFormValid &&
+                                !_isSubmitting
                                 ? Colors.green.shade600
                                 : Colors.grey.shade400,
-                            //foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                              vertical: 18,
-                            ),
+                                vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -713,16 +711,16 @@ class _ShipperFormPageState extends State<ShipperFormPage>
                             _nextStep();
                           }
                               : null,
-                          icon: const Icon(Icons.arrow_forward, size: 18),
-                          label: const Text('Next'),
+                          icon:
+                          const Icon(Icons.arrow_forward),
+                          label: const Text("Next"),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _stepValid[_currentStep]
+                            backgroundColor:
+                            _stepValid[_currentStep]
                                 ? Colors.orange.shade600
                                 : Colors.grey.shade400,
-                            //foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                              vertical: 18,
-                            ),
+                                vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

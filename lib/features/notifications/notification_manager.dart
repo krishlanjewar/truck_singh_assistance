@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 /// Central notification management service for the shipment app.
-/// Handles all notification creation, delivery, and management.
-/// NOTE: Complaint notifications are currently disabled - only shipment notifications are active.
 class NotificationManager {
   static final NotificationManager _instance = NotificationManager._internal();
   factory NotificationManager() => _instance;
@@ -12,10 +10,6 @@ class NotificationManager {
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // ===== CORE NOTIFICATION METHODS =====
-
-  /// Creates a new notification in the database
-  /// Returns the notification ID if successful, null otherwise
   Future<String?> createNotification({
     required String userId,
     required String title,
@@ -25,14 +19,17 @@ class NotificationManager {
     String? sourceId,
   }) async {
     try {
-      final result = await _supabase.rpc('create_smart_notification', params: {
-        'p_user_id': userId,
-        'p_title': title,
-        'p_message': message,
-        'p_type': type,
-        'p_source_type': sourceType,
-        'p_source_id': sourceId,
-      });
+      final result = await _supabase.rpc(
+        'create_smart_notification',
+        params: {
+          'p_user_id': userId,
+          'p_title': title,
+          'p_message': message,
+          'p_type': type,
+          'p_source_type': sourceType,
+          'p_source_id': sourceId,
+        },
+      );
 
       if (kDebugMode) {
         debugPrint('✅ ${tr("notification_created_for_user")}: $userId: $title');
@@ -47,12 +44,13 @@ class NotificationManager {
     }
   }
 
-  /// Marks a notification as processed
+  /// Marks a notification as processed (RPC)
   Future<void> markNotificationProcessed(String notificationId) async {
     try {
-      await _supabase.rpc('mark_notification_processed', params: {
-        'notification_id': notificationId,
-      });
+      await _supabase.rpc(
+        'mark_notification_processed',
+        params: {'notification_id': notificationId},
+      );
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ ${tr("error_marking_notification_processed")}: $e');
@@ -60,12 +58,13 @@ class NotificationManager {
     }
   }
 
-  /// Marks a notification as delivered
+  /// Marks a notification as delivered (RPC)
   Future<void> markNotificationDelivered(String notificationId) async {
     try {
-      await _supabase.rpc('mark_notification_delivered', params: {
-        'notification_id': notificationId,
-      });
+      await _supabase.rpc(
+        'mark_notification_delivered',
+        params: {'notification_id': notificationId},
+      );
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ ${tr("error_marking_notification_delivered")}: $e');
@@ -73,15 +72,25 @@ class NotificationManager {
     }
   }
 
-  /// Retrieves unprocessed notifications for a user
-  Future<List<Map<String, dynamic>>> getUnprocessedNotifications(String userId, {int limit = 10}) async {
+  /// Retrieves unprocessed notifications (RPC)
+  Future<List<Map<String, dynamic>>> getUnprocessedNotifications(
+      String userId, {
+        int limit = 10,
+      }) async {
     try {
-      final result = await _supabase.rpc('get_unprocessed_notifications', params: {
-        'p_user_id': userId,
-        'p_limit': limit,
-      });
+      final result = await _supabase.rpc(
+        'get_unprocessed_notifications',
+        params: {
+          'p_user_id': userId,
+          'p_limit': limit,
+        },
+      );
 
-      return List<Map<String, dynamic>>.from(result);
+      if (result is List) {
+        return List<Map<String, dynamic>>.from(result);
+      }
+
+      return [];
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ ${tr("error_getting_unprocessed_notifications")}: $e');
@@ -90,10 +99,6 @@ class NotificationManager {
     }
   }
 
-  // ===== COMPLAINT NOTIFICATIONS =====
-
-  /// Creates notifications when a complaint is filed
-  /// Notifies both the complainer and the target user
   Future<void> createComplaintNotification({
     required String complainerId,
     required String complaintSubject,
@@ -111,29 +116,25 @@ class NotificationManager {
         sourceId: complaintId,
       );
 
-      // Notify target user if exists
+      // Notify target user (if exists)
       if (targetUserId != null && targetUserId.isNotEmpty) {
-        try {
-          final targetUserProfile = await _supabase
-              .from('user_profiles')
-              .select('user_id')
-              .eq('custom_user_id', targetUserId)
-              .maybeSingle();
+        final targetUserProfile = await _supabase
+            .from('user_profiles')
+            .select('user_id')
+            .eq('custom_user_id', targetUserId)
+            .maybeSingle();
 
-          if (targetUserProfile != null && targetUserProfile['user_id'] != null) {
-            await createNotification(
-              userId: targetUserProfile['user_id'],
-              title: tr("new_complaint_filed_against_you"),
-              message: tr("complaint_against_you", args: [complaintSubject]),
-              type: 'complaint',
-              sourceType: 'app',
-              sourceId: complaintId,
-            );
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('❌ ${tr("error_notifying_target_user")}: $e');
-          }
+        final targetUserUid = targetUserProfile?['user_id'];
+
+        if (targetUserUid != null) {
+          await createNotification(
+            userId: targetUserUid,
+            title: tr("new_complaint_filed_against_you"),
+            message: tr("complaint_against_you", args: [complaintSubject]),
+            type: 'complaint',
+            sourceType: 'app',
+            sourceId: complaintId,
+          );
         }
       }
     } catch (e) {
@@ -143,7 +144,6 @@ class NotificationManager {
     }
   }
 
-  /// Creates status-specific complaint notifications
   Future<void> createComplaintStatusNotification({
     required String userId,
     required String complaintSubject,
@@ -151,6 +151,7 @@ class NotificationManager {
     String? complaintId,
   }) async {
     String message;
+
     switch (status.toLowerCase()) {
       case 'justified':
         message = tr("complaint_justified", args: [complaintSubject]);
@@ -165,13 +166,16 @@ class NotificationManager {
         message = tr("complaint_reverted", args: [complaintSubject]);
         break;
       case 'resolved & accepted':
-        message = tr("complaint_resolved_accepted", args: [complaintSubject]);
+        message =
+            tr("complaint_resolved_accepted", args: [complaintSubject]);
         break;
       case 'auto-resolved':
-        message = tr("complaint_auto_resolved", args: [complaintSubject]);
+        message =
+            tr("complaint_auto_resolved", args: [complaintSubject]);
         break;
       default:
-        message = tr("complaint_status_updated", args: [complaintSubject, status]);
+        message = tr("complaint_status_updated",
+            args: [complaintSubject, status]);
     }
 
     await createNotification(
@@ -184,8 +188,6 @@ class NotificationManager {
     );
   }
 
-  /// Creates notifications for complaint status updates
-  /// Automatically notifies both complainer and target user
   Future<void> createStatusUpdateNotification(
       String complaintId,
       String status,
@@ -197,34 +199,31 @@ class NotificationManager {
           .select('user_id, target_user_id, subject')
           .eq('id', complaintId)
           .maybeSingle();
-
-      if (complaint == null) {
-        if (kDebugMode) {
-          debugPrint('❌ ${tr("complaint_not_found")}: $complaintId');
-        }
-        return;
-      }
-
-      // Notify complainer
+      if (complaint == null) return;
+      final complainerId = complaint['user_id'] as String;
+      final targetUserCustomId = complaint['target_user_id'];
+      final subject = complaint['subject'] as String;
       await createComplaintStatusNotification(
-        userId: complaint['user_id'],
-        complaintSubject: complaint['subject'],
+        userId: complainerId,
+        complaintSubject: subject,
         status: status,
         complaintId: complaintId,
       );
 
-      // Notify target user if exists
-      if (complaint['target_user_id'] != null && complaint['target_user_id'].toString().isNotEmpty) {
-        final targetUserProfile = await _supabase
+      if (targetUserCustomId != null &&
+          targetUserCustomId.toString().isNotEmpty) {
+        final profile = await _supabase
             .from('user_profiles')
             .select('user_id')
-            .eq('custom_user_id', complaint['target_user_id'])
+            .eq('custom_user_id', targetUserCustomId)
             .maybeSingle();
 
-        if (targetUserProfile != null && targetUserProfile['user_id'] != null) {
+        final targetUserUid = profile?['user_id'];
+
+        if (targetUserUid != null) {
           await createComplaintStatusNotification(
-            userId: targetUserProfile['user_id'],
-            complaintSubject: complaint['subject'],
+            userId: targetUserUid,
+            complaintSubject: subject,
             status: status,
             complaintId: complaintId,
           );
@@ -232,14 +231,12 @@ class NotificationManager {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ ${tr("error_creating_status_update_notification")}: $e');
+        debugPrint(
+            '❌ ${tr("error_creating_status_update_notification")}: $e');
       }
     }
   }
 
-  // ===== SHIPMENT NOTIFICATIONS (ACTIVE) =====
-
-  /// Creates notifications for shipment status updates
   Future<void> createShipmentNotification({
     required String userId,
     required String shipmentId,
@@ -248,21 +245,26 @@ class NotificationManager {
     String? drop,
   }) async {
     String message;
+
     switch (status.toLowerCase()) {
       case 'accepted':
-        message = tr("shipment_accepted", args: [shipmentId, pickup ?? 'pickup', drop ?? 'drop']);
+        message = tr("shipment_accepted",
+            args: [shipmentId, pickup ?? 'pickup', drop ?? 'drop']);
         break;
       case 'in-transit':
-        message = tr("shipment_in_transit", args: [shipmentId, pickup ?? 'pickup', drop ?? 'drop']);
+        message = tr("shipment_in_transit",
+            args: [shipmentId, pickup ?? 'pickup', drop ?? 'drop']);
         break;
       case 'delivered':
-        message = tr("shipment_delivered", args: [shipmentId, drop ?? 'drop']);
+        message =
+            tr("shipment_delivered", args: [shipmentId, drop ?? 'drop']);
         break;
       case 'cancelled':
         message = tr("shipment_cancelled", args: [shipmentId]);
         break;
       default:
-        message = tr("shipment_status_updated", args: [shipmentId, status]);
+        message =
+            tr("shipment_status_updated", args: [shipmentId, status]);
     }
 
     await createNotification(
@@ -275,9 +277,6 @@ class NotificationManager {
     );
   }
 
-  // ===== UTILITY METHODS =====
-
-  /// Creates a custom notification with specified parameters
   Future<void> createCustomNotification({
     required String userId,
     required String title,
@@ -295,7 +294,6 @@ class NotificationManager {
     );
   }
 
-  /// Creates the same notification for multiple users
   Future<void> createBulkNotification({
     required List<String> userIds,
     required String title,

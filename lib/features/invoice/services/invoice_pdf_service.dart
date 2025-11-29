@@ -1,11 +1,9 @@
 import 'dart:typed_data';
 import 'package:intl/intl.dart';
-// import 'package:new_test1/models/address_model.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../auth/model/address_model.dart';
 
 enum PdfState { notGenerated, uploaded, downloaded }
@@ -35,55 +33,62 @@ Future<String> generateInvoicePDF({
 }) async {
   final pdf = pw.Document();
   final now = DateTime.now();
-  final formatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+
   final PdfColor primaryColor = PdfColors.blue800;
   final PdfColor secondaryColor = PdfColors.blueGrey600;
   final PdfColor tableHeaderColor = PdfColors.blue100;
-  final PdfColor borderColor = PdfColors.blueGrey300;
+  final border = pw.Border.all(color: PdfColors.blueGrey300, width: .8);
 
-  String formatAddress(String address) => address.replaceAll(", ", ",\n");
+  String addressFormat(String addr) => addr.replaceAll(", ", ",\n");
 
-  String finalCompanyAddress = companyAddress.isNotEmpty
-      ? companyAddress
-      : (companySelectedAddress != null
-      ? '${companySelectedAddress.flatNo}, ${companySelectedAddress.streetName}, ${companySelectedAddress.cityName}, ${companySelectedAddress.district}, ${companySelectedAddress.zipCode}'
-      : '');
+  /// Reusable safe address fallback
+  String safeAddress(String value, dynamic alt) =>
+      value.isNotEmpty ? value : (alt != null ? alt : '');
 
-  String finalCustomerAddress = customerAddress.isNotEmpty
-      ? customerAddress
-      : (billingAddress != null
-      ? '${billingAddress.flatNo}, ${billingAddress.streetName}, ${billingAddress.cityName}, ${billingAddress.district}, ${billingAddress.zipCode}'
-      : '');
+  String finalCompanyAddress = safeAddress(
+    companyAddress,
+    companySelectedAddress != null
+        ? "${companySelectedAddress.flatNo}, ${companySelectedAddress.streetName}, ${companySelectedAddress.cityName}, ${companySelectedAddress.district}, ${companySelectedAddress.zipCode}"
+        : "",
+  );
 
-  String shiptoAddress = shipment['drop'] ?? 'N/A';
+  String finalCustomerAddress = safeAddress(
+    customerAddress,
+    billingAddress != null
+        ? "${billingAddress.flatNo}, ${billingAddress.streetName}, ${billingAddress.cityName}, ${billingAddress.district}, ${billingAddress.zipCode}"
+        : "",
+  );
 
-  String numberToWords(String number) {
-    try {
-      final n = double.tryParse(number) ?? 0.0;
-      return "${n.toStringAsFixed(2)} Rupees only";
-    } catch (_) {
-      return "$number Rupees only";
-    }
-  }
-
-  pw.Widget sectionHeader(String title) {
-    return pw.Container(
-      width: double.infinity,
-      color: tableHeaderColor,
-      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-      child: pw.Text(title,
-          style: pw.TextStyle(
-              fontSize: 13, fontWeight: pw.FontWeight.bold, color: primaryColor)),
-    );
-  }
+  pw.Widget headerBox(String title, List<String> lines) => pw.Container(
+    decoration: pw.BoxDecoration(border: border),
+    padding: const pw.EdgeInsets.all(10),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+          color: tableHeaderColor,
+          child: pw.Text(
+            title,
+            style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: primaryColor,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        ...lines.map((e) => pw.Text(e, style: pw.TextStyle(fontSize: 10))),
+      ],
+    ),
+  );
 
   pdf.addPage(
     pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-
-      build: (context) => [
-        // Header row
+      build: (_) => [
+        /// Header
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -91,245 +96,218 @@ Future<String> generateInvoicePDF({
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(companyName,
-                    style: pw.TextStyle(
-                        fontSize: 20,
-                        fontWeight: pw.FontWeight.bold,
-                        color: primaryColor)),
+                pw.Text(
+                  companyName,
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
                 pw.SizedBox(height: 6),
-                pw.Text(formatAddress(finalCompanyAddress),
-                    style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
-                pw.Text('Phone: $companyMobile',
-                    style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
-                pw.Text("GSTIN: $gstNumber",
-                    style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
+                pw.Text(
+                  addressFormat(finalCompanyAddress),
+                  style: pw.TextStyle(fontSize: 10, color: secondaryColor),
+                ),
+                pw.Text(
+                  "Phone: $companyMobile",
+                  style: pw.TextStyle(fontSize: 10, color: secondaryColor),
+                ),
+                pw.Text(
+                  "GSTIN: $gstNumber",
+                  style: pw.TextStyle(fontSize: 10, color: secondaryColor),
+                ),
               ],
             ),
             pw.Container(
+              padding: const pw.EdgeInsets.symmetric(
+                vertical: 10,
+                horizontal: 16,
+              ),
               decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: primaryColor, width: 2),
-                  borderRadius: pw.BorderRadius.circular(6),
-                  color: primaryColor),
-              padding:
-              const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              child: pw.Text("TAX INVOICE",
-                  style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white)),
-            )
+                border: pw.Border.all(color: primaryColor, width: 2),
+                borderRadius: pw.BorderRadius.circular(6),
+                color: primaryColor,
+              ),
+              child: pw.Text(
+                "TAX INVOICE",
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
           ],
         ),
-        pw.SizedBox(height: 12),
-        pw.Divider(color: borderColor, thickness: 2),
+        pw.SizedBox(height: 18),
 
-        // Address and invoice info
-        pw.SizedBox(height: 12),
+        /// Bill To - Ship To - Invoice
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Expanded(
-              child: pw.Container(
-                decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: borderColor, width: 0.8)),
-                padding: const pw.EdgeInsets.all(10),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    sectionHeader('Bill To'),
-                    pw.SizedBox(height: 6),
-                    pw.Text(customerName,
-                        style: pw.TextStyle(
-                            fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                    pw.Text(formatAddress(finalCustomerAddress),
-                        style: pw.TextStyle(fontSize: 10)),
-                    pw.Text('Mobile: $customerMobile',
-                        style: pw.TextStyle(fontSize: 10)),
-                  ],
-                ),
-              ),
+              child: headerBox("Bill To", [
+                customerName,
+                addressFormat(finalCustomerAddress),
+                "Mobile: $customerMobile",
+              ]),
             ),
-            pw.SizedBox(width: 12),
+            pw.SizedBox(width: 10),
             pw.Expanded(
-              child: pw.Container(
-                decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: borderColor, width: 0.8)),
-                padding: const pw.EdgeInsets.all(10),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    sectionHeader('Ship To'),
-                    pw.SizedBox(height: 6),
-                    pw.Text(shiptoAddress,
-                        style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
-                    pw.Text('Mobile: $customerMobile',
-                        style: pw.TextStyle(fontSize: 10)),
-                  ],
-                ),
-              ),
+              child: headerBox("Ship To", [
+                shipment['drop'] ?? "N/A",
+                "Mobile: $customerMobile",
+              ]),
             ),
-            pw.SizedBox(width: 12),
+            pw.SizedBox(width: 10),
             pw.Expanded(
-              child: pw.Container(
-                decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: borderColor, width: 0.8)),
-                padding: const pw.EdgeInsets.all(10),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    sectionHeader('Invoice Details'),
-                    pw.SizedBox(height: 6),
-                    pw.Text("Invoice No: $invoiceNo",
-                        style: pw.TextStyle(fontSize: 11)),
-                    pw.Text("Date: ${DateFormat('dd-MM-yyyy').format(now)}",
-                        style: pw.TextStyle(fontSize: 11)),
-                  ],
-                ),
-              ),
+              child: headerBox("Invoice Details", [
+                "Invoice No: $invoiceNo",
+                "Date: ${DateFormat('dd-MM-yyyy').format(now)}",
+              ]),
             ),
           ],
         ),
 
-        pw.SizedBox(height: 24),
+        pw.SizedBox(height: 18),
 
-        // Items table header
+        /// Table Header
         pw.Container(
+          padding: const pw.EdgeInsets.all(6),
           color: tableHeaderColor,
-          padding: const pw.EdgeInsets.symmetric(vertical: 8),
           child: pw.Row(
             children: [
-              pw.Expanded(flex: 1, child: pw.Text('No', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 4, child: pw.Text('Item name', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              //pw.Expanded(flex: 3, child: pw.Text('HSN/SAC', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 2, child: pw.Text('Qty', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 3, child: pw.Text('Description', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 2, child: pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 2, child: pw.Text('Taxable amt', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-
-              if (taxType == "CGST+SGST") ...[
-                pw.Expanded(flex: 2, child: pw.Text('CGST', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                pw.Expanded(flex: 2, child: pw.Text('SGST', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              ] else ...[
-                pw.Expanded(flex: 2, child: pw.Text('IGST', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-              ],
-
-              pw.Expanded(flex: 3, child: pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+              for (final t in [
+                "No",
+                "Item",
+                "Qty",
+                "Description",
+                "Price",
+                "Taxable Amt",
+                taxType == "CGST+SGST" ? "CGST" : "IGST",
+                taxType == "CGST+SGST" ? "SGST" : null,
+                "Total",
+              ].where((e) => e != null))
+                pw.Expanded(
+                  child: pw.Text(
+                    t!,
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    maxLines: 1,
+                  ),
+                ),
             ],
           ),
         ),
 
-        // Item row
-        pw.Container(
-          padding: const pw.EdgeInsets.symmetric(vertical: 6),
-          decoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(color: PdfColors.blueGrey200))),
+        /// Item Row
+        pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 4),
           child: pw.Row(
             children: [
-              pw.Expanded(flex: 1, child: pw.Text('1')),
-              pw.Expanded(flex: 4, child: pw.Text(shipment['shipping_item'] ?? 'Logistic SERVICES')),
-              //pw.Expanded(flex: 3, child: pw.Text('999312')),
-              /*pw.Expanded(flex: 2, child: pw.Text('${shipment['weight'] ?? '1'} Ton')),*/
+              pw.Expanded(child: pw.Text("1")),
               pw.Expanded(
-                flex: 2,
                 child: pw.Text(
-                  '${shipment['weight'] != null && shipment['weight'].toString().trim().isNotEmpty ? '${shipment['weight']} Ton' : (shipment['unit'] ?? '')}',
+                  shipment['shipping_item'] ?? "Logistics Services",
                 ),
               ),
-
-              pw.Expanded(flex: 3, child: pw.Text('${shipment['material_inside'] ?? 'null'}')),
-              pw.Expanded(flex: 2, child: pw.Text('$price')),
-              pw.Expanded(flex: 2, child: pw.Text('$taxAmount')),
-
-              if (taxType == "CGST+SGST") ...[
-                pw.Expanded(flex: 2, child: pw.Text('${(double.tryParse(taxAmount) ?? 0) / 2} (${(double.tryParse(taxPercentage) ?? 0) / 2}%)')),
-                pw.Expanded(flex: 2, child: pw.Text('${(double.tryParse(taxAmount) ?? 0) / 2} (${(double.tryParse(taxPercentage) ?? 0) / 2}%)')),
-              ] else ...[
-                pw.Expanded(flex: 2, child: pw.Text('$taxPercentage%')),
-              ],
-
-              pw.Expanded(flex: 3, child: pw.Text('$totalAmount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(child: pw.Text("${shipment['weight'] ?? '1'} Ton")),
+              pw.Expanded(
+                child: pw.Text("${shipment['material_inside'] ?? ''}"),
+              ),
+              pw.Expanded(child: pw.Text(price)),
+              pw.Expanded(child: pw.Text(taxAmount)),
+              pw.Expanded(
+                child: pw.Text(
+                  taxType == "CGST+SGST"
+                      ? "${double.parse(taxAmount) / 2}"
+                      : taxPercentage,
+                ),
+              ),
+              if (taxType == "CGST+SGST")
+                pw.Expanded(child: pw.Text("${double.parse(taxAmount) / 2}")),
+              pw.Expanded(
+                child: pw.Text(
+                  totalAmount,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+              ),
             ],
           ),
         ),
 
         pw.SizedBox(height: 20),
 
-        // Totals
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.end,
-          children: [
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Sub Total: $price', style: pw.TextStyle(fontSize: 11)),
-
-                if (taxType == "CGST+SGST") ...[
-                  pw.Text('CGST: ${(double.tryParse(taxAmount) ?? 0) / 2}', style: pw.TextStyle(fontSize: 11)),
-                  pw.Text('SGST: ${(double.tryParse(taxAmount) ?? 0) / 2}', style: pw.TextStyle(fontSize: 11)),
-                ] else ...[
-                  pw.Text('IGST: $taxAmount', style: pw.TextStyle(fontSize: 11)),
-                ],
-
-                pw.Text('Total: $totalAmount',
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold,
-                        fontSize: 13,
-                        color: primaryColor)),
-              ],
-            )
-          ],
+        /// Totals
+        pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("Sub Total: $price"),
+              pw.Text(
+                taxType == "CGST+SGST"
+                    ? "CGST + SGST: ${double.parse(taxAmount)}"
+                    : "IGST: $taxAmount",
+              ),
+              pw.Text(
+                "Total: $totalAmount",
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
         ),
 
-        pw.SizedBox(height: 12),
+        pw.SizedBox(height: 20),
 
-        pw.Divider(height: 30, color: borderColor),
+        /// Bank Info
+        headerBox("Bank Details", [
+          "Bank: $bankName",
+          "Branch: $branch",
+          "A/C: $accountNumber",
+          "IFSC: $ifscCode",
+          "Account Holder: $accountHolder",
+        ]),
 
-        // Bank Details
-        sectionHeader('Bank Details'),
-        pw.SizedBox(height: 6),
-        pw.Text('Bank Name: $bankName', style: pw.TextStyle(fontSize: 10)),
-        pw.Text('Branch: $branch', style: pw.TextStyle(fontSize: 10)),
-        pw.Text('Account Number: $accountNumber', style: pw.TextStyle(fontSize: 10)),
-        pw.Text('IFSC Code: $ifscCode', style: pw.TextStyle(fontSize: 10)),
-        pw.Text('Account Holder\'s Name: $accountHolder', style: pw.TextStyle(fontSize: 10)),
-
-        pw.SizedBox(height: 24),
-
-        // Footer
-        pw.Text('Terms and Conditions:',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-        pw.Text('This is computer generated invoice',
-            style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
-
-        pw.SizedBox(height: 40),
+        pw.SizedBox(height: 20),
+        pw.Text(
+          "Terms & Conditions:",
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+        pw.Text("This is a computer generated invoice."),
       ],
     ),
   );
 
-  Uint8List pdfBytes = await pdf.save();
+  final pdfBytes = await pdf.save();
 
-  final userId = Supabase.instance.client.auth.currentUser!.id;
-  final profile = await Supabase.instance.client
+  final user = Supabase.instance.client.auth.currentUser!;
+  final custom = await Supabase.instance.client
       .from('user_profiles')
       .select('custom_user_id')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .maybeSingle();
 
-  final shipperId = profile?['custom_user_id'];
-  final fileName = '$shipperId/${shipment['shipment_id']}.pdf';
+  final shipperId = custom?['custom_user_id'];
+  final filePath = "$shipperId/${shipment['shipment_id']}.pdf";
 
-  try {
-    await Supabase.instance.client.storage
-        .from('invoices')
-        .uploadBinary(fileName, pdfBytes, fileOptions: const FileOptions(upsert: true));
-  } catch (e) {
-    throw Exception('Upload failed: $e');
-  }
+  await Supabase.instance.client.storage
+      .from('invoices')
+      .uploadBinary(
+    filePath,
+    pdfBytes,
+    fileOptions: const FileOptions(upsert: true),
+  );
 
-  final publicUrl =
-  Supabase.instance.client.storage.from('invoices').getPublicUrl(fileName);
+  final url = Supabase.instance.client.storage
+      .from('invoices')
+      .getPublicUrl(filePath);
 
-  await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
+  await Printing.layoutPdf(onLayout: (_) => pdfBytes);
 
-  return publicUrl;
+  return url;
 }

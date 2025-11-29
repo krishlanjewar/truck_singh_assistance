@@ -29,7 +29,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
 
   List<String> _addresses = [];
   String? _selectedAddress;
-  // Controllers for all form fields
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, dynamic> _values = {};
   final Map<String, bool> _checkboxValues = {};
@@ -71,11 +70,9 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
     _pageController = PageController();
     _template = BiltyTemplate.defaultTemplate;
     _initializeControllers();
-    if (widget.shipmentId != null) {
-      _loadDriverInfo(widget.shipmentId);
-      _loadRouteDetails(widget.shipmentId);
-      _loadTruckDetails(widget.shipmentId);
-    }
+    _loadDriverInfo(widget.shipmentId);
+    _loadRouteDetails(widget.shipmentId);
+    _loadTruckDetails(widget.shipmentId);
     _loadCompanyAddress();
     _loadgstin();
     _loadBankDetails();
@@ -303,7 +300,7 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 10,
             offset: Offset(0, 4),
@@ -456,79 +453,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
     );
   }
 
-  //--------------- fetch address logic below -------------------
-  Future<void> _fetchAddresses() async {
-    final customUserId = Supabase
-        .instance
-        .client
-        .auth
-        .currentUser
-        ?.userMetadata?['custom_user_id'];
-    if (customUserId == null) {
-      print("No logged in user found");
-      return;
-    }
-
-    try {
-      final response = await Supabase.instance.client
-          .from('user_profiles')
-          .select('company_address1, company_address2, company_address3')
-          .eq('custom_user_id', customUserId)
-          .maybeSingle();
-
-      if (response != null) {
-        List<String> addresses = [];
-
-        for (var key in [
-          'company_address1',
-          'company_address2',
-          'company_address3',
-        ]) {
-          final rawAddress = response[key];
-          if (rawAddress != null && rawAddress.toString().isNotEmpty) {
-            try {
-              final Map<String, dynamic> addressMap = jsonDecode(rawAddress);
-              String formattedAddress = [
-                addressMap['flatNo'],
-                addressMap['streetName'],
-                addressMap['cityName'],
-                addressMap['district'],
-              ].where((e) => e != null && e.toString().isNotEmpty).join(', ');
-
-              if (formattedAddress.isNotEmpty) {
-                addresses.add(formattedAddress);
-              }
-            } catch (e) {
-              print("Error decoding $key: $e");
-            }
-          }
-        }
-
-        setState(() {
-          _addresses = addresses;
-          if (_addresses.isNotEmpty) {
-            _selectedAddress = _addresses.first; // optional default selection
-          }
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _addresses = [];
-          _selectedAddress = null;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print("Error fetching addresses: $e");
-      setState(() {
-        _addresses = [];
-        _selectedAddress = null;
-        _isLoading = false;
-      });
-    }
-  }
-
-  //-------------- load GST number to sender GSTIN ---------------
 
   Future<void> _loadgstin() async {
     try {
@@ -633,15 +557,12 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
       setState(() {
         _controllers['driver_name'] ??= TextEditingController();
         _controllers['driver_name']!.text = response['name'] ?? '';
-
         _controllers['driver_phone'] ??= TextEditingController();
         _controllers['driver_phone']!.text = response['mobile_number'] ?? '';
-
         _controllers['driver_address'] ??= TextEditingController();
         _controllers['driver_address']!.text = formattedAddress;
-
         _controllers['driver_license'] ??= TextEditingController();
-        _controllers['driver_license']!.text = ''; // unknown for now
+        _controllers['driver_license']!.text = '';
       });
     }
   }
@@ -732,7 +653,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
           _controllers['account_name'] ??= TextEditingController();
           _controllers['account_no'] ??= TextEditingController();
           _controllers['ifsc_code'] ??= TextEditingController();
-
           _controllers['bank_name']!.text = bank['bank_name'] ?? '';
           _controllers['account_name']!.text =
               bank['account_holder_name'] ?? '';
@@ -857,17 +777,12 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
     });
   }
 
-  void _updateGoodsItem(int index, GoodsItem item) {
-    setState(() {
-      _goodsItems['goods']![index] = item;
-    });
-  }
 
   // Opens a bottom sheet to add or edit a goods item to reduce congestion in the main UI
   void _openGoodsEditor({int? index}) {
     final bool isEditing = index != null;
     final GoodsItem initial = isEditing
-        ? _goodsItems['goods']![index!]
+        ? _goodsItems['goods']![index]
         : GoodsItem(
       description: '',
       quantity: 1,
@@ -1048,7 +963,7 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
 
                           setState(() {
                             if (isEditing) {
-                              _goodsItems['goods']![index!] = newItem;
+                              _goodsItems['goods']![index] = newItem;
                             } else {
                               _goodsItems['goods']!.add(newItem);
                             }
@@ -1146,7 +1061,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Theme.of(context).cardColor,
-              //color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.blue.shade200),
             ),
@@ -1682,7 +1596,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                       icon: Icon(Icons.add, color: Colors.white, size: 18),
                       label: Text(
                         'add_item'.tr(),
-                        //style: TextStyle(color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
@@ -1697,7 +1610,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                 ],
               ),
               SizedBox(height: 16),
-              // Compact card list for items
               ..._goodsItems['goods']!.asMap().entries.map((entry) {
                 final index = entry.key;
                 final item = entry.value;
@@ -1706,9 +1618,7 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardColor,
-                    //color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    //border: Border.all(color: Colors.grey.shade300),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withAlpha((0.03 * 255).round()),
@@ -1822,13 +1732,11 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        //border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
                         color: Theme.of(context).cardColor,
-                        //color: Colors.white,
                       ),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedPaymentStatus,
+                        initialValue: _selectedPaymentStatus,
                         decoration: InputDecoration(
                           labelText: ' payment_status'.tr(),
                           border: InputBorder.none,
@@ -1903,10 +1811,9 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                         color: Theme.of(context).cardColor,
                         border: Border.all(color: Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
-                        //color: Colors.white,
                       ),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedPaymentStatus,
+                        initialValue: _selectedPaymentStatus,
                         decoration: InputDecoration(
                           labelText: 'payment_status'.tr(),
                           border: InputBorder.none,
@@ -2032,7 +1939,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
     required ValueChanged<bool?> onChanged,
   }) {
     return Container(
-      //color: Theme.of(context).cardColor,
       width: double.infinity,
       child: CheckboxListTile(
         title: Text(
@@ -2041,8 +1947,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
         ),
         value: value,
         onChanged: onChanged,
-        //activeColor: AppColors.tealBlue,
-        //checkColor: Colors.white,
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: EdgeInsets.symmetric(horizontal: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -2151,7 +2055,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
-                  //color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.blue.shade200),
                 ),
@@ -2593,7 +2496,7 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
   // Safely read a field value from controller or fallback store
   String _val(String id) {
     final ctrl = _controllers.putIfAbsent(id, () => TextEditingController());
-    final text = ctrl?.text ?? '';
+    final text = ctrl.text;
     if (text.isNotEmpty) return text;
     final fallback = _values[id]?.toString() ?? '';
     return fallback;
@@ -2606,10 +2509,9 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
 
   Future<void> _submitBilty() async {
     if (!_formKey.currentState!.validate()) {
-      // If form is not valid, jump to the first step with an error
       for (int i = 0; i < _stepTitles.length; i++) {
         setState(() => _currentStep = i);
-        await Future.delayed(Duration(milliseconds: 50)); // Allow UI to update
+        await Future.delayed(Duration(milliseconds: 50));
         if (!_formKey.currentState!.validate()) {
           _pageController.animateToPage(
             i,
@@ -2622,7 +2524,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
       return;
     }
 
-    // Additional validation for dates
     if (_biltyDate == null) {
       ScaffoldMessenger.of(
         context,
@@ -2826,11 +2727,9 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
           key: _formKey,
           child: Column(
             children: [
-              // Custom Step Header
               Container(
                 color: Theme.of(context).cardColor,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                //color: Colors.white,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -2891,7 +2790,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                   ),
                 ),
               ),
-              // Step Content using PageView
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
@@ -2909,11 +2807,9 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                   },
                 ),
               ),
-              // Navigation Buttons
               Container(
                 color: Theme.of(context).cardColor,
                 padding: const EdgeInsets.all(16.0),
-                //color: Colors.white,
                 child: Row(
                   children: [
                     if (_currentStep > 0)
@@ -2948,7 +2844,6 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            //color: Colors.white,
                           ),
                         )
                             : Text(
@@ -2968,21 +2863,14 @@ class _BiltyFormPageState extends State<BiltyFormPage> {
     );
   }
 
-  // Responsive layout helper for text fields
   Widget _buildResponsiveRow({
     required List<Widget> children,
-    double breakpoint = 600,
   }) {
-    // Simpler, crash-proof layout: always stack vertically and translate
-    // horizontal gaps into vertical gaps. This avoids LayoutBuilder edge cases
-    // reported on some devices.
     final List<Widget> columnChildren = [];
     for (final w in children) {
       if (w is SizedBox && w.width != null && (w.width ?? 0) > 0) {
         columnChildren.add(const SizedBox(height: 12));
-      } else if (w != null) {
-        columnChildren.add(w);
-      }
+      } else  columnChildren.add(w);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3128,7 +3016,7 @@ class _CompanyAddressDropdownState extends State<CompanyAddressDropdown> {
         labelText: "select_company_address".tr(),
         border: OutlineInputBorder(),
       ),
-      value: _selectedAddress,
+      initialValue: _selectedAddress,
       items: _addresses
           .map((addr) => DropdownMenuItem(value: addr, child: Text(addr)))
           .toList(),

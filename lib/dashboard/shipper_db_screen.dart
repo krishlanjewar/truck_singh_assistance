@@ -1,7 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:logistics_toolkit/features/blank.dart';
 import 'package:logistics_toolkit/features/trips/myTrips_history.dart';
 import '../dashboard/widgets/feature_card.dart';
 import '../features/complains/mycomplain.dart';
@@ -166,7 +164,7 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.3),
+            color: Colors.green.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -189,7 +187,7 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -258,7 +256,7 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
           width: 40,
           height: 20,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(4),
           ),
         ),

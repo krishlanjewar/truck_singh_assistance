@@ -1,10 +1,8 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // rootBundle
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
-
 import '../../config/config.dart';
 import 'form_step/address_step.dart';
 
@@ -26,7 +24,8 @@ class AppLocalizations {
   }
 
   static Future<AppLocalizations> load(String languageCode) async {
-    final jsonString = await rootBundle.loadString('assets/translations/$languageCode.json');
+    final jsonString =
+    await rootBundle.loadString('assets/translations/$languageCode.json');
     final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
     return AppLocalizations(jsonMap);
   }
@@ -36,7 +35,7 @@ class MapPickerPage extends StatefulWidget {
   const MapPickerPage({Key? key}) : super(key: key);
 
   @override
-  _MapPickerPageState createState() => _MapPickerPageState();
+  State<MapPickerPage> createState() => _MapPickerPageState();
 }
 
 class _MapPickerPageState extends State<MapPickerPage> {
@@ -45,11 +44,11 @@ class _MapPickerPageState extends State<MapPickerPage> {
     zoom: 5,
   );
 
-  late LatLng _selectedPosition = _initialCameraPosition.target;
+  LatLng _selectedPosition = _initialCameraPosition.target;
   GoogleMapController? _mapController;
   bool _isGeocoding = false;
 
-  late AppLocalizations loc;
+  AppLocalizations? loc;
 
   @override
   void initState() {
@@ -58,9 +57,8 @@ class _MapPickerPageState extends State<MapPickerPage> {
   }
 
   Future<void> _loadLocalization() async {
-    // Change 'en' to 'hi' to load Hindi
     loc = await AppLocalizations.load('en');
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> _confirmSelection() async {
@@ -86,7 +84,8 @@ class _MapPickerPageState extends State<MapPickerPage> {
         }
       }
     } catch (e) {
-      debugPrint(loc.translate('reverse_geocode_error', {'error': e.toString()}));
+      debugPrint(
+          loc?.translate('reverse_geocode_error', {'error': e.toString()}));
     } finally {
       if (mounted) setState(() => _isGeocoding = false);
     }
@@ -95,12 +94,14 @@ class _MapPickerPageState extends State<MapPickerPage> {
   @override
   Widget build(BuildContext context) {
     if (loc == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.translate('select_location_title')),
+        title: Text(loc!.translate('select_location_title')),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -110,7 +111,12 @@ class _MapPickerPageState extends State<MapPickerPage> {
           GoogleMap(
             initialCameraPosition: _initialCameraPosition,
             onMapCreated: (controller) => _mapController = controller,
-            onCameraMove: (position) => _selectedPosition = position.target,
+            onCameraMove: (CameraPosition pos) {
+              _selectedPosition = pos.target;
+            },
+
+            onCameraIdle: () {},
+
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
           ),
@@ -156,15 +162,15 @@ class _MapPickerPageState extends State<MapPickerPage> {
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
-                    color: Colors.white,
                     strokeWidth: 2,
+                    color: Colors.white,
                   ),
                 )
                     : const Icon(Icons.check),
                 label: Text(
                   _isGeocoding
-                      ? loc.translate('getting_address')
-                      : loc.translate('confirm_location'),
+                      ? loc!.translate('getting_address')
+                      : loc!.translate('confirm_location'),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange.shade600,

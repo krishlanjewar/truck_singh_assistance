@@ -3,21 +3,24 @@ import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'notification_manager.dart';
 
-/// Service for handling complaint-related actions with integrated notifications
 class ComplaintActionService {
-  static final ComplaintActionService _instance = ComplaintActionService._internal();
+  static final ComplaintActionService _instance =
+  ComplaintActionService._internal();
   factory ComplaintActionService() => _instance;
   ComplaintActionService._internal();
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Provides justification for a complaint and notifies users
-  Future<bool> provideJustification(String complaintId, String justification) async {
+  Future<bool> provideJustification(
+      String complaintId, String justification) async {
     try {
-      await _supabase.rpc('provide_justification', params: {
-        'complaint_id': complaintId,
-        'justification_text': justification,
-      });
+      await _supabase.rpc(
+        'provide_justification',
+        params: {
+          'complaint_id': complaintId,
+          'justification_text': justification,
+        },
+      );
 
       await NotificationManager().createStatusUpdateNotification(
         complaintId,
@@ -37,12 +40,14 @@ class ComplaintActionService {
     }
   }
 
-  /// Accepts justification and notifies users
   Future<bool> acceptJustification(String complaintId) async {
     try {
-      await _supabase.rpc('accept_justification', params: {
-        'complaint_id': complaintId,
-      });
+      await _supabase.rpc(
+        'accept_justification',
+        params: {
+          'complaint_id': complaintId,
+        },
+      );
 
       await NotificationManager().createStatusUpdateNotification(
         complaintId,
@@ -62,12 +67,14 @@ class ComplaintActionService {
     }
   }
 
-  /// Rejects justification and notifies users
   Future<bool> rejectJustification(String complaintId) async {
     try {
-      await _supabase.rpc('reject_justification', params: {
-        'complaint_id': complaintId,
-      });
+      await _supabase.rpc(
+        'reject_justification',
+        params: {
+          'complaint_id': complaintId,
+        },
+      );
 
       await NotificationManager().createStatusUpdateNotification(
         complaintId,
@@ -87,14 +94,17 @@ class ComplaintActionService {
     }
   }
 
-  /// Resolves a complaint and notifies users
-  Future<bool> resolveComplaint(String complaintId, String status, String reason) async {
+  Future<bool> resolveComplaint(
+      String complaintId, String status, String reason) async {
     try {
-      await _supabase.rpc('resolve_complaint', params: {
-        'complaint_id': complaintId,
-        'new_status': status,
-        'resolution_reason': reason,
-      });
+      await _supabase.rpc(
+        'resolve_complaint',
+        params: {
+          'complaint_id': complaintId,
+          'new_status': status,
+          'resolution_reason': reason,
+        },
+      );
 
       await NotificationManager().createStatusUpdateNotification(
         complaintId,
@@ -114,7 +124,6 @@ class ComplaintActionService {
     }
   }
 
-  /// Gets the current user's role
   Future<String?> getUserRole() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -126,7 +135,7 @@ class ComplaintActionService {
           .eq('user_id', user.id)
           .maybeSingle();
 
-      return profile?['role'];
+      return profile?['role'] as String?;
     } catch (e) {
       if (kDebugMode) {
         debugPrint("${tr("error_getting_user_role")}: $e");
@@ -135,7 +144,6 @@ class ComplaintActionService {
     }
   }
 
-  /// Checks if current user can provide justification
   Future<bool> canProvideJustification(String complaintId) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -159,7 +167,8 @@ class ComplaintActionService {
       if (complaint == null) return false;
 
       return complaint['target_user_id'] == customUserId &&
-          (complaint['status'] == 'Open' || complaint['status'] == 'Reverted');
+          (complaint['status'] == 'Open' ||
+              complaint['status'] == 'Reverted');
     } catch (e) {
       if (kDebugMode) {
         debugPrint("${tr("error_checking_justification_permission")}: $e");
@@ -168,7 +177,6 @@ class ComplaintActionService {
     }
   }
 
-  /// Checks if current user can accept/reject justification
   Future<bool> canAcceptRejectJustification(String complaintId) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -192,7 +200,6 @@ class ComplaintActionService {
     }
   }
 
-  /// Checks if current user can resolve complaints
   Future<bool> canResolveComplaint() async {
     try {
       final role = await getUserRole();
@@ -205,8 +212,8 @@ class ComplaintActionService {
     }
   }
 
-  /// Gets complaint details
-  Future<Map<String, dynamic>?> getComplaintDetails(String complaintId) async {
+  Future<Map<String, dynamic>?> getComplaintDetails(
+      String complaintId) async {
     try {
       final complaint = await _supabase
           .from('complaints')
@@ -223,7 +230,6 @@ class ComplaintActionService {
     }
   }
 
-  /// Gets complaints filed by current user
   Future<List<Map<String, dynamic>>> getUserComplaints() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -244,7 +250,6 @@ class ComplaintActionService {
     }
   }
 
-  /// Gets complaints where current user is target
   Future<List<Map<String, dynamic>>> getTargetComplaints() async {
     try {
       final user = _supabase.auth.currentUser;

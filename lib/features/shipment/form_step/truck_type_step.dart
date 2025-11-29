@@ -26,15 +26,20 @@ class TruckTypeStep extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           isLoadingShipper
-              ? const CircularProgressIndicator()
+              ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Center(child: CircularProgressIndicator()),
+          )
               : Padding(
             padding: const EdgeInsets.symmetric(vertical: 10.0),
             child: Text(
               shipperName != null
-                  ? "hiName".tr(namedArgs: {"name":shipperName!})
+                  ? "hiName".tr(namedArgs: {"name": shipperName!})
                   : "hiThere".tr(),
               style: const TextStyle(
-                  fontSize: 26, fontWeight: FontWeight.w600),
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           progressBar,
@@ -43,15 +48,16 @@ class TruckTypeStep extends StatelessWidget {
             child: Text(
               "selectTruckType".tr(),
               style: const TextStyle(
-                  fontSize: 28, fontWeight: FontWeight.bold),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: truckTypes.length,
-            gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               childAspectRatio: 1.6,
               crossAxisSpacing: 10,
@@ -59,24 +65,25 @@ class TruckTypeStep extends StatelessWidget {
             ),
             itemBuilder: (context, index) {
               final type = truckTypes[index];
-              final isSelected = selectedTruckType == type['key'];
+              final bool isSelected = selectedTruckType == type['key'];
+
               return GestureDetector(
                 onTap: () => onTruckTypeSelected(type['key']),
                 child: Container(
                   decoration: BoxDecoration(
                     color: isSelected
                         ? Colors.orange.shade100
-                        : Colors.white,
+                        : Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(
-                      color: isSelected
-                          ? Colors.orange
-                          : Colors.grey.shade300,
+                      color:
+                      isSelected ? Colors.orange : Colors.grey.shade300,
                       width: isSelected ? 3 : 1,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.grey.withOpacity(0.1),
+                        color:
+                        Theme.of(context).shadowColor.withOpacity(0.08),
                         spreadRadius: 1,
                         blurRadius: 5,
                         offset: const Offset(0, 3),
@@ -109,8 +116,11 @@ class TruckTypeStep extends StatelessWidget {
                       if (isSelected)
                         const Padding(
                           padding: EdgeInsets.only(top: 5),
-                          child: Icon(Icons.check_circle,
-                              color: Colors.orange, size: 20),
+                          child: Icon(
+                            Icons.check_circle,
+                            color: Colors.orange,
+                            size: 20,
+                          ),
                         ),
                     ],
                   ),

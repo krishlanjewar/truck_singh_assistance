@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:logistics_toolkit/config/theme.dart';
-import '../../services/user_data_service.dart';
 
 enum UserRole { agent, truckOwner, driver }
 
@@ -256,7 +255,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     return result;
   }
   String _localizedStatusLabel(String statusKey) {
-    final key = (statusKey ?? '').toString().toLowerCase().trim();
+    final key = (statusKey).toString().toLowerCase().trim();
     switch (key) {
       case 'approved':
         return 'approved'.tr();
@@ -457,7 +456,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
               padding: const EdgeInsets.only(right: 8),
               child: Chip(
                 label: Text(roleText, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                backgroundColor: AppColors.teal.withOpacity(0.8),
+                backgroundColor: AppColors.teal.withValues(alpha: 0.8),
               ),
             ),
         ],
@@ -634,7 +633,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), border: Border.all(color: color), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), border: Border.all(color: color), borderRadius: BorderRadius.circular(12)),
               child: Text(_localizedStatusLabel(statusKey), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
             ),
             if (rejectionReason != null && rejectionReason.isNotEmpty)
@@ -654,7 +653,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
   }
 
   Widget _buildActionButtons(String driverId, String docType, String statusKey, String? fileUrl, bool canUpload) {
-    final statusLower = (statusKey ?? '').toString().toLowerCase();
+    final statusLower = statusKey.toString().toLowerCase();
     final buttons = <Widget>[];
 
     if ((statusLower == 'not_uploaded' || statusLower == 'rejected' || statusLower == '') && canUpload) {

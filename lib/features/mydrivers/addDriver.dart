@@ -42,12 +42,10 @@ class _AddDriverPageState extends State<AddDriverPage> {
       return;
     }
 
-    setState(() {
-      loggedInOwnerCustomId = ownerId;
-    });
+    loggedInOwnerCustomId = ownerId;
 
     await fetchAddedDrivers();
-    setState(() => _pageIsLoading = false);
+    if (mounted) setState(() => _pageIsLoading = false);
   }
 
   Future<void> addDriver() async {
@@ -61,9 +59,8 @@ class _AddDriverPageState extends State<AddDriverPage> {
     }
 
     if (loggedInOwnerCustomId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('owner_info_not_loaded'.tr())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('owner_info_not_loaded'.tr())));
       return;
     }
 
@@ -72,66 +69,63 @@ class _AddDriverPageState extends State<AddDriverPage> {
     try {
       Map<String, dynamic>? userResponse;
 
-      if (RegExp(r'^\d{10,}\$').hasMatch(input)) {
-        final userList = await supabase
+      // FIXED REGEX - mobile number must be 10 digits
+      if (RegExp(r'^\d{10}$').hasMatch(input)) {
+        final result = await supabase
             .from('user_profiles')
             .select()
             .eq('mobile_number', input)
             .limit(1);
 
-        if (userList.isEmpty) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('no_driver_with_mobile'.tr())));
+        if (result.isEmpty) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('no_driver_with_mobile'.tr())));
           setState(() => _actionIsLoading = false);
           return;
         }
-        userResponse = userList.first;
+        userResponse = result.first;
       } else {
-        final userList = await supabase
+        final result = await supabase
             .from('user_profiles')
             .select()
             .eq('custom_user_id', input)
             .limit(1);
 
-        if (userList.isEmpty) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('driver_not_found_id'.tr())));
+        if (result.isEmpty) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('driver_not_found_id'.tr())));
           setState(() => _actionIsLoading = false);
           return;
         }
-        userResponse = userList.first;
+        userResponse = result.first;
       }
 
       final driverCustomId = userResponse['custom_user_id'];
 
       if (driverCustomId == loggedInOwnerCustomId) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('cannot_add_self_driver'.tr())));
-        setState(() => _actionIsLoading = false);
-        return;
-      }
-      if (!driverCustomId.startsWith('DRV')) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('cannot_add_non_driver'.tr())));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('cannot_add_self_driver'.tr())));
         setState(() => _actionIsLoading = false);
         return;
       }
 
-      final alreadyRelated = await supabase
+      if (!driverCustomId.toString().startsWith("DRV")) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('cannot_add_non_driver'.tr())));
+        setState(() => _actionIsLoading = false);
+        return;
+      }
+
+      final existingRelation = await supabase
           .from('driver_relation')
           .select()
           .eq('owner_custom_id', loggedInOwnerCustomId!)
           .eq('driver_custom_id', driverCustomId)
           .maybeSingle();
 
-      if (alreadyRelated != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('driver_already_added'.tr())));
+      if (existingRelation != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('driver_already_added'.tr())));
         setState(() => _actionIsLoading = false);
         return;
       }
@@ -142,18 +136,16 @@ class _AddDriverPageState extends State<AddDriverPage> {
       });
 
       await fetchAddedDrivers();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('✅ driver_linked_success'.tr())));
       inputController.clear();
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('driver_linked_success'.tr())));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _actionIsLoading = false);
-      }
+      if (mounted) setState(() => _actionIsLoading = false);
     }
   }
 
@@ -161,40 +153,38 @@ class _AddDriverPageState extends State<AddDriverPage> {
     if (loggedInOwnerCustomId == null) return;
 
     try {
-      final relationData = await supabase
+      final relation = await supabase
           .from('driver_relation')
           .select('driver_custom_id')
           .eq('owner_custom_id', loggedInOwnerCustomId!);
 
-      if (relationData.isEmpty) {
+      if (relation.isEmpty) {
         setState(() => addedDrivers = []);
         return;
       }
 
-      final List<String> driverIds = List<String>.from(
-        relationData.map((item) => item['driver_custom_id']),
-      );
+      final driverIds = relation
+          .map((item) => item['driver_custom_id'].toString())
+          .toList();
 
-      final driverList = await supabase
+      final drivers = await supabase
           .from('user_profiles')
           .select()
           .inFilter('custom_user_id', driverIds);
 
       setState(() {
-        addedDrivers = List<Map<String, dynamic>>.from(driverList);
+        addedDrivers = List<Map<String, dynamic>>.from(drivers);
       });
     } catch (e) {
-      if (mounted) {
-        setState(() => addedDrivers = []);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('error_fetch_driver_list $e'.tr())),
-        );
-      }
+      setState(() => addedDrivers = []);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('error_fetch_driver_list'.tr())));
     }
   }
 
   Future<void> deleteDriver(String driverId) async {
     if (loggedInOwnerCustomId == null) return;
+
     try {
       await supabase
           .from('driver_relation')
@@ -202,117 +192,78 @@ class _AddDriverPageState extends State<AddDriverPage> {
           .eq('owner_custom_id', loggedInOwnerCustomId!)
           .eq('driver_custom_id', driverId);
 
-      setState(() {
-        addedDrivers.removeWhere(
-              (driver) => driver['custom_user_id'] == driverId,
-        );
-      });
+      setState(() =>
+          addedDrivers.removeWhere((d) => d['custom_user_id'] == driverId));
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('driver_removed'.tr())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('driver_removed'.tr())));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error deleting driver: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _toggleDriverAccountStatus(Map<String, dynamic> driver) async {
-    final bool isCurrentlyDisabled = driver['account_disable'] ?? false;
-    final bool willDisable = !isCurrentlyDisabled;
-    final action = willDisable ? 'disable' : 'enable';
+    final isDisabled = driver['account_disable'] ?? false;
+    final shouldDisable = !isDisabled;
+    final action = shouldDisable ? 'disable' : 'enable';
 
     try {
-      final currentUser = supabase.auth.currentUser;
-      if (currentUser == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('No authenticated user found')));
+      final current = supabase.auth.currentUser;
+      if (current == null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("No authenticated user found")));
         return;
       }
 
-      // Get current user's role and email
-      String currentUserRole = 'agent'; // Default fallback
-      String userEmail = currentUser.email ?? 'unknown_user';
+      String role = 'agent';
+      String email = current.email ?? '';
 
-      try {
-        final profileResponse = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
+      final userRole = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', current.id)
+          .maybeSingle();
 
-        if (profileResponse != null && profileResponse['role'] != null) {
-          currentUserRole = profileResponse['role'];
-        }
-      } catch (e) {
-        print('Warning: Could not fetch user role: $e');
+      if (userRole?['role'] != null) {
+        role = userRole!['role'];
       }
+
       await toggleAccountStatusRpc(
         customUserId: driver['custom_user_id'],
-        disabled: willDisable,
-        changedBy: userEmail,
-        changedByRole: currentUserRole,
+        disabled: shouldDisable,
+        changedBy: email,
+        changedByRole: role,
       );
-      if (willDisable) {
-        final String disabledDriverCustomId = driver['custom_user_id'] ?? '';
-        final String? agentCustomId = loggedInOwnerCustomId; // Already available
-        final String disabledDriverName = driver['name'] ?? 'your driver';
+      if (shouldDisable) {
         NotificationService.sendPushNotificationToUser(
-          recipientId: disabledDriverCustomId,
+          recipientId: driver['custom_user_id'],
           title: 'Account Disabled'.tr(),
-          message: 'Your account has been disabled by your agent/owner.'.tr(),
+          message: 'Your account has been disabled by your owner.'.tr(),
           data: {'type': 'account_status'},
         );
-        if (agentCustomId != null) {
-          NotificationService.sendPushNotificationToUser(
-            recipientId: agentCustomId,
-            title: 'Action Confirmation'.tr(),
-            message: 'You have successfully disabled the account for'.tr() + ' $disabledDriverName.',
-            data: {'type': 'admin_log'},
-          );
-        }
       } else {
-        final String enabledDriverCustomId = driver['custom_user_id'] ?? '';
-        final String? agentCustomId = loggedInOwnerCustomId;
-        final String enabledDriverName = driver['name'] ?? 'your driver';
         NotificationService.sendPushNotificationToUser(
-          recipientId: enabledDriverCustomId,
+          recipientId: driver['custom_user_id'],
           title: 'Account Enabled'.tr(),
-          message: 'Your account has been re-enabled by your agent/owner.'.tr(),
+          message: 'Your account has been enabled by your owner.'.tr(),
           data: {'type': 'account_status'},
         );
-
-        // 2. Notify the agent (self-notification)
-        if (agentCustomId != null) {
-          NotificationService.sendPushNotificationToUser(
-            recipientId: agentCustomId,
-            title: 'Action Confirmation'.tr(),
-            message: 'You have successfully enabled the account for'.tr() + ' $enabledDriverName.',
-            data: {'type': 'admin_log'},
-          );
-        }
       }
 
-      final result = {'ok': true};
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Driver account ${action}d successfully'),
+          content: Text("Driver account ${action}d successfully"),
           backgroundColor: Colors.green,
         ),
       );
+
       await fetchAddedDrivers();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -320,7 +271,7 @@ class _AddDriverPageState extends State<AddDriverPage> {
       body: _pageIsLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             TextField(
@@ -329,29 +280,25 @@ class _AddDriverPageState extends State<AddDriverPage> {
                 labelText: 'enter_driver_id_mobile'.tr(),
                 border: const OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.text,
             ),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: _actionIsLoading ? null : addDriver,
               icon: _actionIsLoading
-                  ? Container(
-                width: 24,
-                height: 24,
-                padding: const EdgeInsets.all(2.0),
-                child: const CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 3,
-                ),
-              )
+                  ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ))
                   : const Icon(Icons.person_add_alt_1),
               label: Text('add_driver'.tr()),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'your_added_drivers'.tr(),
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+
+            const SizedBox(height: 18),
+            Text('your_added_drivers'.tr(),
+                style: Theme.of(context).textTheme.titleLarge),
             const Divider(),
             Expanded(
               child: addedDrivers.isEmpty
@@ -365,22 +312,19 @@ class _AddDriverPageState extends State<AddDriverPage> {
                     final isDisabled =
                         driver['account_disable'] ?? false;
                     return Card(
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 0,
-                      ),
                       child: ListTile(
                         leading: const CircleAvatar(
                           child: Icon(Icons.person),
                         ),
                         title: Text(
-                          '${driver['name'] ?? 'No Name'}',
+                          driver['name'] ?? 'No Name',
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
+                              fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
-                          'ID: ${driver['custom_user_id']}\nContact: ${driver['mobile_number'] ?? 'N/A'}\nStatus: ${isDisabled ? 'Disabled' : 'Enabled'}',
+                          "ID: ${driver['custom_user_id']}\n"
+                              "Contact: ${driver['mobile_number'] ?? 'N/A'}\n"
+                              "Status: ${isDisabled ? 'Disabled' : 'Enabled'}",
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -392,77 +336,14 @@ class _AddDriverPageState extends State<AddDriverPage> {
                                     : Icons.block,
                                 size: 18,
                               ),
-                              label: Text(
-                                isDisabled
-                                    ? 'disable'.tr()
-                                    : 'enable'.tr(),
-                              ),
+                              label: Text(isDisabled
+                                  ? 'enable'.tr()
+                                  : 'disable'.tr()),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isDisabled
                                     ? Colors.green
                                     : Colors.red,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                              onPressed: () async {
-                                final action = isDisabled
-                                    ? 'enable'.tr()
-                                    : 'disable'.tr();
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: Text(
-                                      'confirm_deletion'.tr(),
-                                    ),
-                                    content: Text(
-                                      'confirm_remove_driver'.tr(),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(
-                                              ctx,
-                                              false,
-                                            ),
-                                        child: Text('cancel'.tr()),
-                                      ),
-                                      ElevatedButton(
-                                        style:
-                                        ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                          isDisabled
-                                              ? Colors.green
-                                              : Colors.red,
-                                        ),
-                                        onPressed: () =>
-                                            Navigator.pop(
-                                              ctx,
-                                              true,
-                                            ),
-                                        child: Text(
-                                          action.toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  await _toggleDriverAccountStatus(
-                                    driver,
-                                  );
-                                }
-                              },
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.delete_forever,
-                                color: Colors.red.shade700,
                               ),
                               onPressed: () async {
                                 final confirm =
@@ -470,36 +351,65 @@ class _AddDriverPageState extends State<AddDriverPage> {
                                   context: context,
                                   builder: (ctx) => AlertDialog(
                                     title: Text(
-                                      'confirm_deletion'.tr(),
-                                    ),
+                                        'confirm_action'.tr()),
                                     content: Text(
-                                      'confirm_remove_driver'
+                                      (isDisabled
+                                          ? 'confirm_enable'
+                                          : 'confirm_disable')
                                           .tr(),
                                     ),
                                     actions: [
                                       TextButton(
                                         onPressed: () =>
                                             Navigator.pop(
-                                              ctx,
-                                              false,
-                                            ),
-                                        child: Text(
-                                          'cancel'.tr(),
-                                        ),
+                                                ctx, false),
+                                        child: Text('cancel'.tr()),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(
+                                                ctx, true),
+                                        child: Text(isDisabled
+                                            ? 'enable'.tr()
+                                            : 'disable'.tr()),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await _toggleDriverAccountStatus(
+                                      driver);
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete_forever,
+                                  color: Colors.red.shade700),
+                              onPressed: () async {
+                                final confirm =
+                                await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: Text(
+                                        'confirm_deletion'.tr()),
+                                    content: Text(
+                                        'confirm_remove_driver'
+                                            .tr()),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(
+                                                ctx, false),
+                                        child: Text('cancel'.tr()),
                                       ),
                                       TextButton(
                                         onPressed: () =>
                                             Navigator.pop(
-                                              ctx,
-                                              true,
-                                            ),
+                                                ctx, true),
                                         child: Text(
                                           'delete'.tr(),
-                                          style:
-                                          const TextStyle(
-                                            color:
-                                            Colors.red,
-                                          ),
+                                          style: const TextStyle(
+                                              color: Colors.red),
                                         ),
                                       ),
                                     ],
@@ -508,8 +418,7 @@ class _AddDriverPageState extends State<AddDriverPage> {
 
                                 if (confirm == true) {
                                   await deleteDriver(
-                                    driver['custom_user_id'],
-                                  );
+                                      driver['custom_user_id']);
                                 }
                               },
                             ),

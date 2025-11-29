@@ -312,14 +312,14 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.teal, AppColors.teal.withOpacity(0.8)],
+          colors: [AppColors.teal, AppColors.teal.withValues(alpha: 0.8)],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.teal.withOpacity(0.3),
+            color: AppColors.teal.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -344,8 +344,8 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
               Switch(
                 value: _isTrackingEnabled,
                 onChanged: _toggleTracking,
-                activeTrackColor: AppColors.orange.withOpacity(0.5),
-                activeColor: Colors.white,
+                activeTrackColor: AppColors.orange.withValues(alpha: 0.5),
+                activeThumbColor: Colors.white,
               ),
             ],
           ),
@@ -515,7 +515,7 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -530,7 +530,7 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(icon, color: color, size: 28),

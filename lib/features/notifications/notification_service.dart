@@ -5,9 +5,7 @@ class NotificationService {
   static final SupabaseClient _client = Supabase.instance.client;
   static String? _currentUserCustomId;
   static Future<String?> getCurrentCustomUserId() async {
-    if (_currentUserCustomId != null) {
-      return _currentUserCustomId;
-    }
+    if (_currentUserCustomId != null) return _currentUserCustomId;
 
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -22,9 +20,8 @@ class NotificationService {
           .from('user_profiles')
           .select('custom_user_id')
           .eq('user_id', user.id)
-          .single();
-
-      _currentUserCustomId = response['custom_user_id'] as String?;
+          .maybeSingle();
+      _currentUserCustomId = response?['custom_user_id'] as String?;
       return _currentUserCustomId;
     } catch (e) {
       if (kDebugMode) {
@@ -34,6 +31,7 @@ class NotificationService {
     }
   }
 
+  // Stream unread notifications count (updated for Dart 3 strict typing)
   static Stream<int> getUnreadCountStream() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return Stream.value(0);
@@ -42,8 +40,11 @@ class NotificationService {
         .from('notifications')
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
-        .map((data) => data.where((n) => n['read'] == false).length);
+        .map((data) {
+      return data.where((n) => (n['read'] == false)).length;
+    });
   }
+  // Send an in-app notification AND server-side push
   static Future<void> sendNotification({
     required String recipientUserId,
     required String title,
@@ -65,6 +66,7 @@ class NotificationService {
         print('Error creating in-app notification: $e');
       }
     }
+    // Resolve push recipient (custom_user_id)
     String pushRecipientId = recipientUserId;
     try {
       final profile = await _client
@@ -73,14 +75,16 @@ class NotificationService {
           .eq('user_id', recipientUserId)
           .maybeSingle();
 
-      if (profile != null && profile['custom_user_id'] != null) {
-        pushRecipientId = profile['custom_user_id'];
+      final customId = profile?['custom_user_id'];
+      if (customId != null) {
+        pushRecipientId = customId;
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error resolving custom_user_id for push: $e');
       }
     }
+    // Trigger edge function
     await sendPushNotificationToUser(
       recipientId: pushRecipientId,
       title: title,

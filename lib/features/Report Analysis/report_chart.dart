@@ -46,7 +46,7 @@ class ShipmentListItem extends StatelessWidget {
       button: true,
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 6),
-        color: statusColor.withOpacity(0.12),
+        color: statusColor.withValues(alpha: 0.12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: ListTile(
           leading: CircleAvatar(
@@ -216,9 +216,7 @@ class _ReportAnalysisPageState extends State<ReportAnalysisPage> {
           .order('updated_at', ascending: false)
           .range(start, end);
 
-      final List<Map<String, dynamic>> newItems = (raw is List)
-          ? raw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
-          : [];
+      final List<Map<String, dynamic>> newItems = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
       setState(() {
         if (loadMore) {
@@ -460,7 +458,7 @@ class _ReportAnalysisPageState extends State<ReportAnalysisPage> {
                   label: Text('${e.key} (${e.value})'),
                   selected: activeChartFilter == e.key,
                   backgroundColor:
-                  statusColors[e.key]!.withOpacity(0.18),
+                  statusColors[e.key]!.withValues(alpha: 0.18),
                   selectedColor: statusColors[e.key],
                   onSelected: (_) {
                     setState(() {

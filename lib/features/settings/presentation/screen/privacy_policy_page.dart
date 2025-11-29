@@ -1,4 +1,3 @@
-// lib/features/settings/presentation/screen/privacy_policy_page.dart
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 

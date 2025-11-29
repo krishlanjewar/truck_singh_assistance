@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'complain_detail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 
@@ -445,7 +444,7 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -537,7 +536,7 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
           controller: _tabController!,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.7),
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
           labelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,

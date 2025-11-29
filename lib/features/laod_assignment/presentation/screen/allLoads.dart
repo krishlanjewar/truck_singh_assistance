@@ -268,19 +268,19 @@ class _allLoadsPageState extends State<allLoadsPage>
 
     switch (status) {
       case 'pending':
-        headerColor = Colors.orange.withOpacity(0.15);
+        headerColor = Colors.orange.withValues(alpha: 0.15);
         headerText = 'pending Assignment';
         break;
       case 'assigned':
-        headerColor = Colors.blue.withOpacity(0.15);
+        headerColor = Colors.blue.withValues(alpha: 0.15);
         headerText = 'Driver assigned';
         break;
       case 'completed':
-        headerColor = Colors.green.withOpacity(0.15);
+        headerColor = Colors.green.withValues(alpha: 0.15);
         headerText = 'completed';
         break;
       default:
-        headerColor = Colors.grey.withOpacity(0.15);
+        headerColor = Colors.grey.withValues(alpha: 0.15);
     }
 
     return Container(
@@ -290,7 +290,7 @@ class _allLoadsPageState extends State<allLoadsPage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -351,13 +351,13 @@ class _allLoadsPageState extends State<allLoadsPage>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: headerColor.withOpacity(0.5),
+                      color: headerColor.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       headerText,
                       style: TextStyle(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withValues(alpha: 0.7),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),

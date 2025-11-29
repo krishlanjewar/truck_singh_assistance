@@ -8,16 +8,13 @@ import '../features/driver_documents/driver_documents_page.dart';
 import '../features/trips/myTrips_history.dart';
 import '../features/truck_documents/truck_documents_page.dart';
 import '../widgets/common/app_bar.dart';
-import '../features/auth/services/supabase_service.dart';
 import 'package:logistics_toolkit/features/bilty/shipment_selection_page.dart';
 import '../services/onesignal_notification_service.dart';
-import '../services/chat_service.dart';
 import '../features/settings/presentation/screen/settings_page.dart';
 import '../features/mytruck/mytrucks.dart';
 import '../features/mydrivers/mydriver.dart';
 import '../features/tracking/tracktruckspage.dart';
 import '../features/complains/mycomplain.dart';
-import '../features/blank.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../features/laod_assignment/presentation/cubits/shipment_cubit.dart';
@@ -151,9 +148,7 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final currentLocale = context.locale;
     return Scaffold(
-      //backgroundColor: const Color(0xFFF5F7FA),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       appBar: _buildAppBar(),
@@ -207,7 +202,7 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.3),
+            color: Colors.blue.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),

@@ -65,7 +65,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     super.dispose();
   }
 
-  // --- NEW HELPER FUNCTION ---
   String _getDriverName(String driverId) {
     try {
       final driver = _drivers.firstWhere(
@@ -97,13 +96,11 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       _loggedInOwnerId = profile['custom_user_id'];
       _loggedInOwnerName = profile['name'];
 
-
       if (_loggedInOwnerId == null) {
         _showErrorSnackBar('auth_required'.tr());
         setState(() => _isLoading = false);
         return;
       }
-
 
       await _fetchDriversWithDocStatus();
       _animationController.forward();
@@ -181,9 +178,8 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         return {
           ...driver,
           'doc_status': docStatus,
-          'total_docs': docStatus.values
-              .where((doc) => doc['uploaded'])
-              .length,
+          'total_docs':
+          docStatus.values.where((doc) => doc['uploaded']).length,
           'completion_percentage':
           (docStatus.values.where((doc) => doc['uploaded']).length /
               _documentTypes.length *
@@ -228,25 +224,22 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
 
       final sanitizedDocType = docType.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
       final folderPath = '$driverId/$sanitizedDocType';
-      final existingFiles = await supabase.storage
-          .from('driver-documents')
-          .list(path: folderPath);
+      final existingFiles =
+      await supabase.storage.from('driver-documents').list(path: folderPath);
       if (existingFiles.isNotEmpty) {
-        final filesToDelete = existingFiles
-            .map((file) => '$folderPath/${file.name}')
-            .toList();
+        final filesToDelete =
+        existingFiles.map((file) => '$folderPath/${file.name}').toList();
         await supabase.storage.from('driver-documents').remove(filesToDelete);
       }
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileExtension = platformFile.extension ?? 'jpg';
-      final filePath = '$folderPath/${timestamp}.$fileExtension';
+      final filePath = '$folderPath/$timestamp.$fileExtension';
 
       await supabase.storage.from('driver-documents').upload(filePath, file);
 
-      final fileUrl = supabase.storage
-          .from('driver-documents')
-          .getPublicUrl(filePath);
+      final fileUrl =
+      supabase.storage.from('driver-documents').getPublicUrl(filePath);
 
       await supabase.from('driver_documents').upsert({
         'owner_custom_id': _loggedInOwnerId!,
@@ -265,7 +258,8 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       NotificationService.sendPushNotificationToUser(
         recipientId: driverId,
         title: 'Document Uploaded'.tr(),
-        message: '$agentName has uploaded a new document for you: $docType'.tr(),
+        message:
+        '$agentName has uploaded a new document for you: $docType'.tr(),
         data: {'type': 'document_upload', 'doc_type': docType},
       );
 
@@ -274,7 +268,9 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       NotificationService.sendPushNotificationToUser(
         recipientId: _loggedInOwnerId!,
         title: 'Upload Successful'.tr(),
-        message: 'You have successfully uploaded $docType for $driverNameForSelf.'.tr(),
+        message:
+        'You have successfully uploaded $docType for $driverNameForSelf.'
+            .tr(),
         data: {'type': 'document_upload_self', 'driver_id': driverId},
       );
       // --- END NOTIFICATION LOGIC ---
@@ -359,9 +355,8 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       doc['file_url'] = null;
 
       final docStatusMap = driver['doc_status'] as Map<String, dynamic>;
-      driver['total_docs'] = docStatusMap.values
-          .where((d) => d['uploaded'] == true)
-          .length;
+      driver['total_docs'] =
+          docStatusMap.values.where((d) => d['uploaded'] == true).length;
       driver['completion_percentage'] =
           (driver['total_docs'] / _documentTypes.length * 100).round();
     });
@@ -383,9 +378,8 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           driver['doc_status'][docType] = originalDocData;
 
           final docStatusMap = driver['doc_status'] as Map<String, dynamic>;
-          driver['total_docs'] = docStatusMap.values
-              .where((d) => d['uploaded'] == true)
-              .length;
+          driver['total_docs'] =
+              docStatusMap.values.where((d) => d['uploaded'] == true).length;
           driver['completion_percentage'] =
               (driver['total_docs'] / _documentTypes.length * 100).round();
         });
@@ -416,15 +410,14 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       fileUrl,
     );
 
-    // --- ADD NOTIFICATION LOGIC (SCENARIO 2 & 3) ---
     if (success) {
       final agentName = _loggedInOwnerName ?? 'Your Agent';
       if (newStatus == 'verified') {
         NotificationService.sendPushNotificationToUser(
           recipientId: driverId,
           title: 'Document Approved'.tr(),
-          // Use agentName here
-          message: 'Your document ($docType) has been approved by $agentName.'.tr(),
+          message:
+          'Your document ($docType) has been approved by $agentName.'.tr(),
           data: {
             'type': 'document_status',
             'doc_type': docType,
@@ -432,12 +425,11 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           },
         );
       } else if (newStatus == 'rejected') {
-        // This file's logic doesn't ask for a reason, so we send a generic message
         NotificationService.sendPushNotificationToUser(
           recipientId: driverId,
           title: 'Document Rejected'.tr(),
-          // Use agentName here
-          message: 'Your document ($docType) was rejected by $agentName.'.tr(),
+          message:
+          'Your document ($docType) was rejected by $agentName.'.tr(),
           data: {
             'type': 'document_status',
             'doc_type': docType,
@@ -446,7 +438,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         );
       }
     }
-    // --- END NOTIFICATION LOGIC ---
 
     if (!success && mounted) {
       setState(() {
@@ -462,19 +453,19 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title:  Text('confirm_deletion'.tr()),
-          content:  Text(
+          title: Text('confirm_deletion'.tr()),
+          content: Text(
             'delete_doc_warning'.tr(),
           ),
           actions: <Widget>[
             TextButton(
-              child:  Text('cancel'.tr()),
+              child: Text('cancel'.tr()),
               onPressed: () {
                 Navigator.of(context).pop(false);
               },
             ),
             TextButton(
-              child:  Text('delete'.tr()),
+              child: Text('delete'.tr()),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               onPressed: () {
                 Navigator.of(context).pop(true);
@@ -532,7 +523,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title:  Text('driver_documents'.tr())),
+      appBar: AppBar(title: Text('driver_documents'.tr())),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -776,6 +767,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       ),
     );
   }
+
   Widget _buildActionButtons(
       String driverId,
       String docType,
@@ -838,7 +830,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       return TextButton.icon(
         onPressed: () => _uploadDocument(driverId, docType),
         icon: const Icon(Icons.upload_file, size: 16),
-        label:  Text('upload'.tr()),
+        label: Text('upload'.tr()),
       );
     }
   }

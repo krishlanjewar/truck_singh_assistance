@@ -10,11 +10,6 @@ class AppVersionPage extends StatelessWidget {
     final double width = size.width;
     final bool isTablet = width > 600 && width <= 1000;
     final bool isDesktop = width > 1000;
-    final double titleSize = isDesktop
-        ? 32
-        : isTablet
-        ? 28
-        : 26;
     final double bodyFontSize = isDesktop
         ? 16
         : isTablet
@@ -96,7 +91,7 @@ class AppVersionPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12.withOpacity(0.08),
+            color: Colors.black12.withValues(alpha: 0.08),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),

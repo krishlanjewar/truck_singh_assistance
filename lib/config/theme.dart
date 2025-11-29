@@ -106,7 +106,6 @@ class AppTheme {
       colorScheme: ColorScheme.dark().copyWith(
         primary: AppColors.teal,
         secondary: AppColors.orange,
-        background: AppColors.darkBackground,
         surface: AppColors.darkSurface,
       ),
       appBarTheme: const AppBarTheme(
@@ -204,8 +203,6 @@ ThemeData darkTheme = ThemeData.dark().copyWith(
   colorScheme: const ColorScheme.dark(
     primary: Colors.deepPurple,
     secondary: Colors.orangeAccent,
-    surfaceVariant: Color(0xFF2A2A2A),
+    surfaceContainerHighest: Color(0xFF2A2A2A),
   ),
 );
-
-

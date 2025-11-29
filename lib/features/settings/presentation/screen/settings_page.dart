@@ -233,7 +233,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // More comprehensive GST validation
     final gstRegex = RegExp(
-      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$',
+      r'^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
     );
 
     if (!gstRegex.hasMatch(gst)) return false;
@@ -249,7 +249,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // Validate PAN format within GST (positions 2-11)
     final panPart = gst.substring(2, 12);
-    final panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$');
+    final panRegex = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$');
     if (!panRegex.hasMatch(panPart)) return false;
 
     return true;
@@ -507,7 +507,7 @@ class _SettingsPageState extends State<SettingsPage> {
         };
 
         if (isEditing) {
-          await _updateBankDetails(existingBank!['bank_id'], bankData);
+          await _updateBankDetails(existingBank['bank_id'], bankData);
         } else {
           await _addBankDetails(bankData);
         }
@@ -877,117 +877,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _showEditMobileDialog() async {
-    final mobileController = TextEditingController(text: mobile_number ?? "");
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("edit_mobile".tr()),
-        content: TextField(
-          controller: mobileController,
-          decoration: InputDecoration(
-            labelText: "mobile_number".tr(),
-            hintText: "+91XXXXXXXXXX",
-          ),
-          keyboardType: TextInputType.phone,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text("cancel".tr()),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text("verify".tr()),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final newMobile = mobileController.text.trim();
-      if (newMobile.isEmpty) return;
-
-      try {
-        // Request OTP from Supabase
-        await supabase.auth.signInWithOtp(phone: newMobile);
-
-        if (context.mounted) {
-          _showOtpVerificationDialog(newMobile);
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Error sending OTP')));
-      }
-    }
-  }
-
-  Future<void> _showOtpVerificationDialog(String mobileNumberInput) async {
-    final otpController = TextEditingController();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("verify_otp").tr(),
-        content: TextField(
-          controller: otpController,
-          decoration: InputDecoration(labelText: "verify_otp".tr()),
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text("cancel".tr()),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text("verify".tr()),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final otp = otpController.text.trim();
-      if (otp.isEmpty) return;
-
-      try {
-        final response = await supabase.auth.verifyOTP(
-          type: OtpType.sms,
-          token: otp,
-          phone: mobileNumberInput,
-        );
-
-        if (response.user != null) {
-          await supabase
-              .from('user_profiles')
-              .update({
-            'mobile_number': mobileNumberInput,
-            'mobile_no_verified': true,
-          })
-              .eq('user_id', user!.id);
-
-          setState(() {
-            mobile_number = mobileNumberInput;
-            mobile_no_verified = true;
-          });
-
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("mobile_verified".tr())));
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('OTP verification failed')));
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("otp_failed").tr()));
-      }
-    }
-  }
 
   Future<void> _signOut(BuildContext context) async {
     final bool? confirmLogout = await showDialog<bool>(
@@ -1041,30 +931,26 @@ class _SettingsPageState extends State<SettingsPage> {
           builder: (context, setState) {
             return AlertDialog(
               title: Text("chooseTheme".tr()),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RadioListTile<ThemeMode>(
-                    title: Text('light_mode'.tr()),
-                    value: ThemeMode.light,
-                    groupValue: selectedMode,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => selectedMode = value);
-                      }
-                    },
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: Text('dark_mode'.tr()),
-                    value: ThemeMode.dark,
-                    groupValue: selectedMode,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => selectedMode = value);
-                      }
-                    },
-                  ),
-                ],
+              content: RadioGroup(
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => selectedMode = value);
+                  }
+                },
+                groupValue: selectedMode,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<ThemeMode>(
+                      title: Text('light_mode'.tr()),
+                      value: ThemeMode.light,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('dark_mode'.tr()),
+                      value: ThemeMode.dark,
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -1087,79 +973,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
 
-  Future<void> _uploadProfilePicture() async {
-    final userId = user?.id;
-    if (userId == null) return;
 
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: Text("takePhoto".tr()),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickAndUploadImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: Text("chooseFromGallery".tr()),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pickAndUploadImage(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _pickAndUploadImage(ImageSource source) async {
-    final userId = user?.id;
-    if (userId == null) return;
-
-    final XFile? pickedFile = await _picker.pickImage(source: source);
-    if (pickedFile == null) return;
-
-    final File file = File(pickedFile.path);
-    final String fileExt = p.extension(file.path);
-    final String fileName = '${const Uuid().v4()}$fileExt';
-    final String filePath = 'profile_picture/$userId/$fileName';
-
-    try {
-      await supabase.storage
-          .from('profilepic')
-          .upload(filePath, file, fileOptions: const FileOptions(upsert: true));
-
-      final String publicUrl = supabase.storage
-          .from('profilepic')
-          .getPublicUrl(filePath);
-
-      await supabase
-          .from('user_profiles')
-          .update({'profile_picture': publicUrl})
-          .eq('user_id', userId);
-
-      setState(() {
-        profile_picture = publicUrl;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile picture updated successfully')),
-      );
-    } catch (e) {
-      debugPrint('Upload error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to upload profile picture')),
-      );
-    }
-  }
 
   Future<void> _reportBug() async {
     final TextEditingController bugController = TextEditingController();
@@ -1319,33 +1133,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     final password = newPasswordController.text;
                     final strength = getPasswordStrength(password);
 
-                    Object getHint(String pwd) {
-                      if (pwd.isEmpty) {
-                        return "passwordHint".tr();
-                      }
-
-                      List<String> suggestions = [];
-                      if (!RegExp(r'.{8,}').hasMatch(pwd)) {
-                        suggestions.add("atLeast8Chars".tr());
-                      }
-                      if (!RegExp(r'[A-Z]').hasMatch(pwd)) {
-                        suggestions.add("uppercaseLetter".tr());
-                      }
-                      if (!RegExp(r'[a-z]').hasMatch(pwd)) {
-                        suggestions.add("lowercaseLetter".tr());
-                      }
-                      if (!RegExp(r'\d').hasMatch(pwd)) {
-                        suggestions.add("aNumber".tr());
-                      }
-                      if (!RegExp(r'[@$!%*?&]').hasMatch(pwd)) {
-                        suggestions.add("specialCharacter".tr());
-                      }
-
-                      if (suggestions.isEmpty) {
-                        return "passwordStrong".tr();
-                      }
-                      return "Hint: Add ${suggestions.join(', ')}.";
-                    }
 
                     return strength.isEmpty
                         ? const SizedBox.shrink()
@@ -1477,76 +1264,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _showEditNameDialog() async {
-    _nameController.text = name ?? "";
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("editName".tr()),
-        content: TextField(
-          controller: _nameController,
-          decoration: InputDecoration(labelText: "fullName".tr()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text("cancel".tr()),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text("save".tr()),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final newName = _nameController.text.trim();
-
-      if (newName.isNotEmpty && newName != name) {
-        final doubleConfirm = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text("confirmNameChange".tr()),
-            content: Text("nameChangeMessage\"$name\" to \"$newName\"?".tr()),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text("no".tr()),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text("yes".tr()),
-              ),
-            ],
-          ),
-        );
-
-        if (doubleConfirm == true) {
-          try {
-            await supabase
-                .from('user_profiles')
-                .update({'name': newName})
-                .eq('user_id', user!.id);
-
-            setState(() {
-              name = newName;
-              _editingName = false;
-            });
-
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text("nameUpdated".tr())));
-          } catch (e) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text("nameUpdateError $e".tr())));
-          }
-        }
-      }
-    }
-  }
 
   Future<void> deleteAccount() async {
     final supabase = Supabase.instance.client;
@@ -1586,7 +1303,7 @@ class _SettingsPageState extends State<SettingsPage> {
       await supabase
           .from("user_profiles")
           .update({"account_disable": true})
-          .eq('user_id', user!.id);
+          .eq('user_id', user.id);
       await supabase.auth.signOut();
 
       if (context.mounted) {
@@ -2208,33 +1925,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-void _showLanguageDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('chooseLanguage'.tr()),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            title: Text('English'.tr()),
-            onTap: () {
-              context.setLocale(const Locale('en'));
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: Text("हिंदी".tr()),
-            onTap: () {
-              context.setLocale(const Locale('hi'));
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
-    ),
-  );
-}
 
 class SettingsTile extends StatelessWidget {
   final IconData icon;
