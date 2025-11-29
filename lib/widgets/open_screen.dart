@@ -42,14 +42,14 @@ Future<void> openScreen(String? screen, context, Map params) async {
       break;
 
     case "track_trucks":
-
-
       final truckOwnerId = params['truckOwnerId'];
+      print('truckOwnerId in the openscreen:$truckOwnerId');
 
       if (truckOwnerId == null) {
         print("TRACK ERROR: truckOwnerId not found");
         return;
       }
+
         Navigator.push(
           context,
           MaterialPageRoute(

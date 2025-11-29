@@ -131,7 +131,9 @@ class ChatProvider extends ChangeNotifier {
 
         if (screen == "track_trucks") {
           final user = await SupabaseService.getCurrentUser();
+          print('User in tracktruck:$user');
           final customUid = await SupabaseService.getCustomUserId(user!.id);
+          print('customUid in trackTruck:$customUid');
 
           params['truckOwnerId'] = customUid;
         }
@@ -390,25 +392,6 @@ class ChatProvider extends ChangeNotifier {
           break;
 
 
-      // //GET TRACK TRUCKS
-      //   case 'track_trucks':
-      //     final response = await ShipmentService.getTrackTrucks(truckId: params['truck_number']);
-      //     if(response == null){
-      //       replyText = 'truck is not found';
-      //     }
-      //     else {
-      //       replyText = 'Apka truck abhi $response me hai';
-      //     }
-      //     break;
-      //
-      //
-      // //GET MARKETPLACE SHIPMENTS
-      //   case 'get_marketplace_shipment':
-      //     final list = await ShipmentService.getAvailableMarketplaceShipments();
-      //     final market_place_shipments_ids = filterIdsByMap(list, "shipment_id");
-      //     replyText = "${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${market_place_shipments_ids.join(",")}";
-      //     break;
-
           // OPEN SCREEN
         case 'open_screen':
           final screen = params['screen']?.toString() ?? '';
@@ -450,6 +433,7 @@ class ChatProvider extends ChangeNotifier {
           actionParameters: {
             'language': parsed.language,
             'action': parsed.action,
+            'truckOwnerId':params['truckOwnerId']
           },
           actionButtonLabel: buttonLabel,
           actionButtonScreen: buttonScreen,

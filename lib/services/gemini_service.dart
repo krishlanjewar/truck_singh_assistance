@@ -190,7 +190,7 @@ IF CurrentUserRole is "Agent":
   - get_shared_shipments
   - get_my_trucks
   - get_available_trucks
-  - get_shipments_by_status
+  - get_shipments_by_status               
   - get_status_by_shipment_id
   - get_all_drivers
   - get_driver_details
@@ -234,7 +234,7 @@ IF CurrentUserRole is "Shipper":
   - get_active_shipments
   - get_completed_shipments
   - get_shared_shipments
-  - get_shipments_by_status
+  - get_shipments_by_status 
   - get_status_by_shipment_id
   - get_marketplace_shipment
   - open_screen
@@ -343,6 +343,8 @@ Valid screens:
 - setting
 - report_and_analysis
 
+
+
 But remember: apply ROLE RULES to decide which screens are allowed for that user.
 
 2) track_trucks
@@ -372,7 +374,7 @@ Output:
 3) get_shipments_by_status
 ---------------------------
 When user asks:
-- "pending shipment dikhao"
+- "pending shipment btao"
 - "completed shipment kitni hain"
 - "in transit shipment batao"
 
@@ -384,7 +386,7 @@ Valid statuses:
 - "Loading"
 - "Picked Up"
 - "In Transit"
-- "Arrived at Drop"
+- "Arrived at Drop" 
 - "Unloading"
 - "Delivered"
 - "Completed"
@@ -393,7 +395,7 @@ Output:
 {
   "action": "get_shipments_by_status",
   "parameters": {
-    "status": ["<one_or_more_statuses>"]
+    "status": "<status>"                        
   },
   "reply": "<short sentence + 1–3 suggestion queries>",
   "language": "<hi | en>"
