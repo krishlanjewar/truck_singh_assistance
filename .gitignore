@@ -44,5 +44,5 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 # Environment files
-.env
+../truck_singh_syyed/.env
 .env.*
