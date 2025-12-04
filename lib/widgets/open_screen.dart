@@ -7,6 +7,7 @@ import 'package:logistics_toolkit/features/laod_assignment/presentation/screen/a
 import 'package:logistics_toolkit/features/mytruck/mytrucks.dart';
 import 'package:logistics_toolkit/features/notifications/presentation/screen/notification_center.dart';
 import 'package:logistics_toolkit/features/settings/presentation/screen/notificationDetails_page.dart';
+import 'package:logistics_toolkit/features/shipment/shipper_form_page.dart';
 import 'package:logistics_toolkit/features/tracking/tracktruckspage.dart';
 import 'package:logistics_toolkit/features/trips/myTrips.dart';
 import 'package:logistics_toolkit/features/trips/myTrips_history.dart';
@@ -141,6 +142,36 @@ Future<void> openScreen(String? screen, context, Map params) async {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ReportAnalysisPage()),
+      );
+      break;
+
+      //  shipper
+      
+      case "create_shipment":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ShipperFormPage()),
+      );
+      break;
+
+      case "activeTrips":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MyShipments()),
+      );
+      break;
+
+      case "sharedtrips":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SharedShipmentsPage()),
+      );
+      break;
+
+      case "invoice":
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MyTripsHistory()),
       );
       break;
   }

@@ -1,10 +1,10 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:logistics_toolkit/features/mytruck/mytrucks.dart';
 import 'package:logistics_toolkit/services/gemini_service.dart';
 import 'package:logistics_toolkit/services/intent_parser.dart';
 import 'package:logistics_toolkit/services/shipment_service.dart';
+import 'package:logistics_toolkit/services/shipper_chatbot.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/auth/services/supabase_service.dart';
@@ -35,7 +35,6 @@ class ChatMessage {
         "language": actionParameters!["language"],
     };
   }
-
 }
 
 class ChatProvider extends ChangeNotifier {
@@ -73,7 +72,6 @@ class ChatProvider extends ChangeNotifier {
       return enText;
     }
   }
-
 
   void toggleTts() {
     ttsEnabled = !ttsEnabled;
@@ -126,7 +124,7 @@ class ChatProvider extends ChangeNotifier {
       // Decide if message should include an action button (open_screen)
       String? buttonLabel;
       String? buttonScreen;
-      if (parsed.action == 'open_screen'){
+      if (parsed.action == 'open_screen') {
         final screen = params['screen']?.toString() ?? '';
 
         if (screen == "track_trucks") {
@@ -146,20 +144,21 @@ class ChatProvider extends ChangeNotifier {
 
       //if the action requires a DB query, do it here
       switch (parsed.action) {
-
-      //GET ACTIVE SHIPMENTS
+        //GET ACTIVE SHIPMENTS
         case 'get_active_shipments':
           final response = await ShipmentService.getAllMyShipments();
           final count = (response as List).length;
           final active_shipment_ids = filterIdsByMap(response, 'shipment_id');
           replyText = _localizeReply(
             langCode: parsed.language,
-            hiText: 'Aapki $count shipments abhi active hain.\nActive Shipments IDs: ${active_shipment_ids.join(",")}',
-            enText: 'You currently have $count active shipments.\nActive shipment IDs: ${active_shipment_ids.join(",")}',
+            hiText:
+                'Aapki $count shipments abhi active hain.\nActive Shipments IDs: ${active_shipment_ids.join(",")}',
+            enText:
+                'You currently have $count active shipments.\nActive shipment IDs: ${active_shipment_ids.join(",")}',
           );
           break;
 
-      //GET COMPLETED SHIPMENTS
+        //GET COMPLETED SHIPMENTS
         case 'get_completed_shipments':
           final response = await ShipmentService.getAllMyCompletedShipments();
           final completed = (response as List).length;
@@ -170,10 +169,12 @@ class ChatProvider extends ChangeNotifier {
           );
           break;
 
-      //GET SHARED SHIPMENTS
+        //GET SHARED SHIPMENTS
         case 'get_shared_shipments':
           final response = await ShipmentService.getSharedShipments();
-          final shipmentIds = response.map((singleShipment) => singleShipment['shipment_id']).toList();
+          final shipmentIds = response
+              .map((singleShipment) => singleShipment['shipment_id'])
+              .toList();
           if (shipmentIds.isEmpty) {
             replyText = _localizeReply(
               langCode: parsed.language,
@@ -184,18 +185,19 @@ class ChatProvider extends ChangeNotifier {
             replyText = _localizeReply(
               langCode: parsed.language,
               hiText:
-              'Aapke paas ${shipmentIds.length} shipments abhi shared hain.\nShipments IDs: ${shipmentIds.join(",")}',
+                  'Aapke paas ${shipmentIds.length} shipments abhi shared hain.\nShipments IDs: ${shipmentIds.join(",")}',
               enText:
-              'You currently have ${shipmentIds.length} shared shipments.\nShipment IDs: ${shipmentIds.join(",")}',
+                  'You currently have ${shipmentIds.length} shared shipments.\nShipment IDs: ${shipmentIds.join(",")}',
             );
           }
           break;
 
-
-      //GET ALL TRUCKS
+        //GET ALL TRUCKS
         case 'get_my_trucks':
           final response = await ShipmentService.getAllTrucks();
-          final truckNumbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
+          final truckNumbers = response
+              .map((single_truck) => single_truck['truck_number'])
+              .toList();
           if (truckNumbers.isEmpty) {
             replyText = _localizeReply(
               langCode: parsed.language,
@@ -206,17 +208,19 @@ class ChatProvider extends ChangeNotifier {
             replyText = _localizeReply(
               langCode: parsed.language,
               hiText:
-              '${response.length} trucks hain.\nTrucks Numbers: ${truckNumbers.join(",")}',
+                  '${response.length} trucks hain.\nTrucks Numbers: ${truckNumbers.join(",")}',
               enText:
-              'You have ${response.length} trucks.\nTruck numbers: ${truckNumbers.join(",")}',
+                  'You have ${response.length} trucks.\nTruck numbers: ${truckNumbers.join(",")}',
             );
           }
           break;
 
-      //GET AVAILABLE TRUCKS
+        //GET AVAILABLE TRUCKS
         case 'get_available_trucks':
           final response = await ShipmentService.getAvailableTrucks();
-          final truckNumbers = response.map((single_truck) => single_truck['truck_number']).toList() ;
+          final truckNumbers = response
+              .map((single_truck) => single_truck['truck_number'])
+              .toList();
           if (truckNumbers.isEmpty) {
             replyText = _localizeReply(
               langCode: parsed.language,
@@ -227,14 +231,14 @@ class ChatProvider extends ChangeNotifier {
             replyText = _localizeReply(
               langCode: parsed.language,
               hiText:
-              '${response.length} trucks abhi khali hain.\nTrucks Numbers: ${truckNumbers.join(",")}',
+                  '${response.length} trucks abhi khali hain.\nTrucks Numbers: ${truckNumbers.join(",")}',
               enText:
-              '${response.length} trucks are currently available.\nTruck numbers: ${truckNumbers.join(",")}',
+                  '${response.length} trucks are currently available.\nTruck numbers: ${truckNumbers.join(",")}',
             );
           }
           break;
 
-      //GET SHIPMENTS BY STATUS
+        //GET SHIPMENTS BY STATUS
         case 'get_shipments_by_status':
           final response = await ShipmentService.getShipmentByStatus(
             status: params["status"],
@@ -242,8 +246,9 @@ class ChatProvider extends ChangeNotifier {
 
           print("STATUS FROM CHAT PROVIDERa: '${params["status"]}'");
 
-
-          final totalShipments = response.map((shipment) => shipment['shipment_id']).toList() ;
+          final totalShipments = response
+              .map((shipment) => shipment['shipment_id'])
+              .toList();
           print("STATUS FROM CHAT PROVIDERb: '${totalShipments.length}'");
 
           final statusLabel = params['status'];
@@ -251,23 +256,22 @@ class ChatProvider extends ChangeNotifier {
           if (totalShipments.isEmpty) {
             replyText = _localizeReply(
               langCode: parsed.language,
-              hiText:
-              'Abhi 0 shipments "$statusLabel" status me hain.',
+              hiText: 'Abhi 0 shipments "$statusLabel" status me hain.',
               enText:
-              'You currently have 0 shipments with status "$statusLabel".',
+                  'You currently have 0 shipments with status "$statusLabel".',
             );
           } else {
             replyText = _localizeReply(
               langCode: parsed.language,
               hiText:
-              '${totalShipments.length} shipments abhi "$statusLabel" status me hain.\nShipment IDs: ${totalShipments.join(",")}',
+                  '${totalShipments.length} shipments abhi "$statusLabel" status me hain.\nShipment IDs: ${totalShipments.join(",")}',
               enText:
-              'You currently have ${totalShipments.length} shipments with status "$statusLabel".\nShipment IDs: ${totalShipments.join(",")}',
+                  'You currently have ${totalShipments.length} shipments with status "$statusLabel".\nShipment IDs: ${totalShipments.join(",")}',
             );
           }
           break;
 
-      //  GET STATUS BY SHIPMENT ID
+        //  GET STATUS BY SHIPMENT ID
         case 'get_status_by_shipment_id':
           final id = params['shipment_id'];
 
@@ -307,10 +311,12 @@ class ChatProvider extends ChangeNotifier {
           }
           break;
 
-      //GET ALL DRIVERS
+        //GET ALL DRIVERS
         case 'get_all_drivers':
           final response = await ShipmentService.getAllDrivers();
-          final driverNumbers = response.map((driver) => driver['driver_custom_id']).toList() ;
+          final driverNumbers = response
+              .map((driver) => driver['driver_custom_id'])
+              .toList();
           if (driverNumbers.isEmpty) {
             replyText = _localizeReply(
               langCode: parsed.language,
@@ -321,14 +327,14 @@ class ChatProvider extends ChangeNotifier {
             replyText = _localizeReply(
               langCode: parsed.language,
               hiText:
-              '${driverNumbers.length} drivers hain.\nDriver Numbers: ${driverNumbers.join(",")}',
+                  '${driverNumbers.length} drivers hain.\nDriver Numbers: ${driverNumbers.join(",")}',
               enText:
-              'You have ${driverNumbers.length} drivers.\nDriver IDs: ${driverNumbers.join(",")}',
+                  'You have ${driverNumbers.length} drivers.\nDriver IDs: ${driverNumbers.join(",")}',
             );
           }
           break;
 
-      //GET DRIVER DETAILS
+        //GET DRIVER DETAILS
         case 'get_driver_details':
           final driverId = params['driver_id'];
           if (driverId == null) {
@@ -339,23 +345,21 @@ class ChatProvider extends ChangeNotifier {
             );
             return;
           }
-          final response =
-          await ShipmentService.getDriverDetails(userId: driverId);
+          final response = await ShipmentService.getDriverDetails(
+            userId: driverId,
+          );
           final name = response['name'];
           final email = response['email'];
           final role = response['role'];
 
           replyText = _localizeReply(
             langCode: parsed.language,
-            hiText:
-            'Driver details:\nNaam: $name\nEmail: $email\nRole: $role',
-            enText:
-            'Driver details:\nName: $name\nEmail: $email\nRole: $role',
+            hiText: 'Driver details:\nNaam: $name\nEmail: $email\nRole: $role',
+            enText: 'Driver details:\nName: $name\nEmail: $email\nRole: $role',
           );
           break;
 
-
-      //GET TRACK TRUCKS
+        //GET TRACK TRUCKS
         case 'track_trucks':
           final response = await ShipmentService.getTrackTrucks(
             truckId: params['truck_number'],
@@ -375,33 +379,30 @@ class ChatProvider extends ChangeNotifier {
           }
           break;
 
-      //GET MARKETPLACE SHIPMENTS
+        //GET MARKETPLACE SHIPMENTS
         case 'get_marketplace_shipment':
-          final list =
-          await ShipmentService.getAvailableMarketplaceShipments();
-          final marketPlaceShipmentsIds =
-          filterIdsByMap(list, "shipment_id");
+          final list = await ShipmentService.getAvailableMarketplaceShipments();
+          final marketPlaceShipmentsIds = filterIdsByMap(list, "shipment_id");
 
           replyText = _localizeReply(
             langCode: parsed.language,
             hiText:
-            '${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${marketPlaceShipmentsIds.join(",")}',
+                '${list.length} marketplace shipments available hain.\nMarket Place Shipments: ${marketPlaceShipmentsIds.join(",")}',
             enText:
-            'There are ${list.length} marketplace shipments available.\nShipment IDs: ${marketPlaceShipmentsIds.join(",")}',
+                'There are ${list.length} marketplace shipments available.\nShipment IDs: ${marketPlaceShipmentsIds.join(",")}',
           );
           break;
 
-
-          // OPEN SCREEN
+        // OPEN SCREEN
         case 'open_screen':
           final screen = params['screen']?.toString() ?? '';
           replyText = parsed.reply.isNotEmpty
               ? parsed.reply
               : _localizeReply(
-            langCode: parsed.language,
-            hiText: '$screen screen open kar raha hoon.',
-            enText: 'Opening $screen screen.',
-          );
+                  langCode: parsed.language,
+                  hiText: '$screen screen open kar raha hoon.',
+                  enText: 'Opening $screen screen.',
+                );
 
           if (screen.isNotEmpty) {
             buttonLabel = _localizeReply(
@@ -412,15 +413,48 @@ class ChatProvider extends ChangeNotifier {
             buttonScreen = screen;
           }
           break;
+
+        // shipper
+        case 'create_shipment':
+          final res = await ShipperChatbot.createShipment(
+            source: params['source'],
+            destination: params['destination'],
+            weight: params['weight'],
+            material: params['material'],
+          );
+
+          replyText = "Shipment created successfully! ID: ${res['id']}";
+          break;
+
+        case 'get_shared_shipments':
+          final shipments = await ShipperChatbot.getSharedShipments();
+          replyText = "Shared shipments: ${shipments.length}";
+          break;
+
+        case 'get_all_my_shipments':
+          final shipments = await ShipperChatbot.getAllMyShipments();
+          replyText = "All my shipments: ${shipments.length}";
+          break;
+
+        case 'invoice':
+          final invoice = await ShipperChatbot.getInvoice();
+          replyText = "Invoice: $invoice";
+          break;
+
+        case 'active_trips':
+          final activeTrips = await ShipperChatbot.getActiveTrips();
+          replyText = "Active trips: ${activeTrips.length}";
+          break;
+
         default:
           // unknown: model may already have included a helpful reply
           if (replyText.isEmpty) {
             replyText = _localizeReply(
               langCode: parsed.language,
               hiText:
-              'Mujhe ye request clear nahi hui, aap shipments, trucks ya drivers se related sawal puch sakte ho.',
+                  'Mujhe ye request clear nahi hui, aap shipments, trucks ya drivers se related sawal puch sakte ho.',
               enText:
-              'I could not clearly understand this request. You can ask about your shipments, trucks or drivers.',
+                  'I could not clearly understand this request. You can ask about your shipments, trucks or drivers.',
             );
           }
           break;
@@ -433,7 +467,7 @@ class ChatProvider extends ChangeNotifier {
           actionParameters: {
             'language': parsed.language,
             'action': parsed.action,
-            'truckOwnerId':params['truckOwnerId']
+            'truckOwnerId': params['truckOwnerId'],
           },
           actionButtonLabel: buttonLabel,
           actionButtonScreen: buttonScreen,
@@ -447,14 +481,16 @@ class ChatProvider extends ChangeNotifier {
       // }
     } catch (e) {
       addBotMessage(
-        ChatMessage(text: _localizeReply(
-          langCode: 'en',
-          hiText:
-          'Mujhe samajhne me dikkat aa rahi hai, dubara simple shabdon me likho.',
-          enText:
-          'I am having trouble understanding this, please try again in simpler words.',
-        )
-          , isUser: false),
+        ChatMessage(
+          text: _localizeReply(
+            langCode: 'en',
+            hiText:
+                'Mujhe samajhne me dikkat aa rahi hai, dubara simple shabdon me likho.',
+            enText:
+                'I am having trouble understanding this, please try again in simpler words.',
+          ),
+          isUser: false,
+        ),
       );
       print(e);
     } finally {
